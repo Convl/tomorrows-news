@@ -1,0 +1,23 @@
+[project]
+name = "tomorrows-news"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.16.4",
+    "asyncpg>=0.30.0",
+    "fastapi[standard]>=0.116.1",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "python-multipart>=0.0.20",
+    "sqlalchemy>=2.0.41",
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+line-ending = "auto"
