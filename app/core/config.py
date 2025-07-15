@@ -5,6 +5,11 @@ class Settings(BaseSettings):
     # Database settings
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/events_db"
 
+    @property
+    def CONNECT_ARGS(self) -> dict:
+        """Connection args for SQLAlchemy engine, disables prepared statements if using Supabase transaction pooler"""
+        return {"prepared_statement_cache_size": 0} if "supabase.com:6543" in self.DATABASE_URL else {}
+
     # App settings
     APP_NAME: str = "Court Events API"
     APP_VERSION: str = "0.1.0"

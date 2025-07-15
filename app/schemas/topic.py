@@ -8,6 +8,7 @@ class TopicBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     keywords: str | None = None
+    country: str | None = None
     is_active: bool = True
 
 

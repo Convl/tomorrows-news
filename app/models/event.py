@@ -28,7 +28,6 @@ class Event(Base):
     # Deduplication fields
     embedding_vector = Column(Text, nullable=True)  # Store vector embedding as text
     similarity_hash = Column(String(64), nullable=True, index=True)  # For quick similarity checks
-    confidence_score = Column(Float, default=0.0)  # AI confidence in the extraction
 
     # Status fields
     is_verified = Column(Boolean, default=False)
@@ -36,7 +35,6 @@ class Event(Base):
     duplicate_of_id = Column(Integer, ForeignKey("events.id"), nullable=True)
 
     # Metadata
-    extracted_metadata = Column(JSON, nullable=True)  # Raw extraction data from AI
     processing_notes = Column(Text, nullable=True)  # Notes from AI processing
 
     # Timestamps
@@ -45,9 +43,8 @@ class Event(Base):
 
     # Foreign keys
     topic_id = Column(Integer, ForeignKey("topics.id"), nullable=False)
-    source_id = Column(Integer, ForeignKey("sources.id"), nullable=True)
 
     # Relationships
     topic = relationship("Topic", back_populates="events")
-    source = relationship("Source", back_populates="events")
+    event_sources = relationship("EventSource", back_populates="event", cascade="all, delete-orphan")
     duplicate_of = relationship("Event", remote_side=[id], backref="duplicates")

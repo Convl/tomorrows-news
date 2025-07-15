@@ -1,14 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.types import Lifespan
+from contextlib import asynccontextmanager
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 # Set up CORS middleware
@@ -34,7 +41,3 @@ async def root():
     }
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}

@@ -1,6 +1,7 @@
 from .event import Event
-from .source import Source
+from .event_source import EventSource
+from .scraping_source import ScrapingSource
 from .topic import Topic
 from .user import User
 
-__all__ = ["User", "Topic", "Event", "Source"]
+__all__ = ["User", "Topic", "Event", "ScrapingSource", "EventSource"]

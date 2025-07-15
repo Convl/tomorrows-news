@@ -12,6 +12,7 @@ class Topic(Base):
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     keywords = Column(Text, nullable=True)  # JSON or comma-separated keywords for matching
+    country = Column(String(200), nullable=True)  # Country name or code as text
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -22,3 +23,4 @@ class Topic(Base):
     # Relationships
     user = relationship("User", back_populates="topics")
     events = relationship("Event", back_populates="topic", cascade="all, delete-orphan")
+    scraping_sources = relationship("ScrapingSource", back_populates="topic", cascade="all, delete-orphan")
