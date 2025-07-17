@@ -3,13 +3,15 @@ from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 
+from app.core.enums import ScrapingSourceEnum
+
 
 class ScrapingSourceBase(BaseModel):
     """Base schema for scraping sources"""
 
     name: str = Field(..., min_length=1, max_length=200)
     base_url: str = Field(..., max_length=500)
-    source_type: str = Field(..., max_length=50)  # "webpage", "rss", "api"
+    source_type: ScrapingSourceEnum = Field(...)  # "webpage", "rss", "api"
     country: str | None = Field(None, max_length=100)
     language: str | None = Field(None, max_length=10)
     description: str | None = None

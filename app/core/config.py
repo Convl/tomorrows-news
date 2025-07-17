@@ -1,19 +1,40 @@
+from uuid import uuid4
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Database settings
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/events_db"
+    DATABASE_URL: str = "loaded from .env file"
+
+    @property
+    def SYNC_DATABASE_URL(self) -> str:
+        "Sync version of the db url, needed for APScheduler"
+        return self.DATABASE_URL.replace("+asyncpg", "")
 
     @property
     def CONNECT_ARGS(self) -> dict:
-        """Connection args for SQLAlchemy engine, disables prepared statements if using Supabase transaction pooler"""
-        return {"prepared_statement_cache_size": 0} if "supabase.com:6543" in self.DATABASE_URL else {}
+        """Connection args for async SQLAlchemy engine, disables prepared statements if using Supabase transaction pooler"""
+        # TODO: This may cause issues on DDL changes to e.g. Enums,
+        # cf https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#prepared-statement-cache
+        # cf https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#prepared-statement-name-with-pgbouncer
+        # cf https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL
+        # cf https://github.com/supabase/supavisor/issues/287
+        return (
+            {
+                "prepared_statement_cache_size": 0,  
+                "statement_cache_size": 0,
+                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",  
+            }
+            if "supabase.com:6543" in self.DATABASE_URL
+            else {}
+        )
 
     # App settings
     APP_NAME: str = "Court Events API"
     APP_VERSION: str = "0.1.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
+    PYTHONASYNCIODEBUG : bool = False
 
     # API settings
     API_V1_STR: str = "/api/v1"

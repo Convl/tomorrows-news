@@ -1,15 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.types import Lifespan
 from contextlib import asynccontextmanager
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.worker.scheduler import scheduler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    scheduler.start()
     yield
-    
+    scheduler.shutdown()
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -37,7 +39,14 @@ async def root():
     return {
         "message": f"Welcome to {settings.APP_NAME}",
         "version": settings.APP_VERSION,
-        "docs_url": f"{settings.API_V1_STR}/docs",
+        "docs_url": "/docs",
+        "openapi_json": f"{settings.API_V1_STR}/openapi.json",
     }
+
+@app.get("/debug")
+async def dbg():
+    print("debug entry hit")
+    from app.worker.scraper import scraper
+    await scraper.scrape(7)
 
 

@@ -32,3 +32,25 @@ def gdbs():
 
     Session = sessionmaker(bind=engine)
     return Session()
+
+
+def debug_scrape_sync(source_id: int):
+    """Sync version for debugging - use this in debug console instead of await scraper.scrape()"""
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import Settings
+    from app.models.scraping_source import ScrapingSource
+
+    settings = Settings()
+    # Create sync engine from async URL
+    sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    engine = create_engine(sync_url)
+    Session = sessionmaker(engine)
+
+    with Session() as session:
+        source = session.execute(select(ScrapingSource).where(ScrapingSource.id == source_id)).scalars().one_or_none()
+        if not source:
+            print(f"Source with id {source_id} not found.")
+            return
+        print(f"Found source: {source}")
