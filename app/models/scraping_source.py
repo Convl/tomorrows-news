@@ -52,46 +52,51 @@ class ScrapingSource(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    jobstore : str = "scraping"
+    jobstore: str = "scraping"
 
     @property
     def job_id(self) -> str:
         """Generate consistent job ID for this scraping source"""
         if not self.id:
             # TODO: Make sure this can't actually happen
-            raise Exception("Scraping Source id is None. Perhaps the Scraping Source got deleted, and now the deletion of its job has failed?")
+            raise Exception(
+                "Scraping Source id is None. Perhaps the Scraping Source got deleted, and now the deletion of its job has failed?"
+            )
         return f"scraping_source_{self.id}"
-    
+
     def schedule_job(self):
         """Schedule job for this source if it is active"""
         # Only schedule if source is active
         if self.is_active:
+            from apscheduler.triggers.interval import IntervalTrigger
+
             from app.worker.scheduler import scheduler
             from app.worker.scraper import scraper
-            from apscheduler.triggers.interval import IntervalTrigger
+
             scheduler.add_job(
                 func=scraper.scrape,
                 args=[self.id],
                 trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 id=self.job_id,
                 jobstore=self.jobstore,
-                replace_existing=True
+                replace_existing=True,
             )
-    
+
     def remove_job(self):
         """Remove the scheduled job for this source"""
         from app.worker.scheduler import scheduler
-        
+
         try:
             scheduler.remove_job(self.job_id, jobstore=self.jobstore)
         except Exception:
             pass
-    
+
     def update_job(self):
         """Update job only if necessary"""
-        from app.worker.scheduler import scheduler
         from apscheduler.triggers.interval import IntervalTrigger
-        
+
+        from app.worker.scheduler import scheduler
+
         try:
             if not (existing_job := scheduler.get_job(self.job_id, jobstore=self.jobstore)):
                 self.schedule_job()
@@ -103,37 +108,40 @@ class ScrapingSource(Base):
             if existing_job.trigger.interval.total_seconds() != self.scraping_frequency * 60:
                 scheduler.reschedule_job(
                     job_id=self.job_id,
-                    jobstore=self.jobstore, 
+                    jobstore=self.jobstore,
                     trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 )
         except Exception as e:
             self.remove_job()
             self.schedule_job()
             raise e
-    
+
 
 # SQLAlchemy event listeners to automatically manage jobs
-@event.listens_for(ScrapingSource, 'after_insert')
+@event.listens_for(ScrapingSource, "after_insert")
 def schedule_job_after_insert(mapper, connection, target: ScrapingSource):
     target.schedule_job()
 
 
-@event.listens_for(ScrapingSource, 'after_update')
+@event.listens_for(ScrapingSource, "after_update")
 def update_job_after_update(mapper, connection, target: ScrapingSource):
     """Automatically update job after ScrapingSource is modified"""
     # Check if relevant fields changed
     state = target.__dict__
-    history = state.get('_sa_instance_state')
-    
+    history = state.get("_sa_instance_state")
+
     if history and history.attrs:
-        changed_fields = {key for key in ['scraping_frequency', 'is_active'] 
-                         if key in history.attrs and history.attrs[key].history.has_changes()}
-        
+        changed_fields = {
+            key
+            for key in ["scraping_frequency", "is_active"]
+            if key in history.attrs and history.attrs[key].history.has_changes()
+        }
+
         if changed_fields:
             target.update_job()
 
 
-@event.listens_for(ScrapingSource, 'after_delete')
+@event.listens_for(ScrapingSource, "after_delete")
 def remove_job_after_delete(mapper, connection, target: ScrapingSource):
     """Automatically remove job after ScrapingSource is deleted"""
     # Not sure if the commit will destroy the target (or set its id to None), so best to grab the id / jobstore before

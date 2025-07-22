@@ -21,7 +21,7 @@ from app.worker.scraper import scraper
 async def test_scraper(source_id: int = 5):
     """Test the scraper with a specific source ID"""
     print(f"Testing scraper with source_id={source_id}")
-    await scraper.scrape(source_id)
+    await scraper._prepare_sources(source_id)
 
 
 async def list_sources():

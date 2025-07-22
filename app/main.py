@@ -1,16 +1,19 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.worker.scheduler import scheduler
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
     yield
     scheduler.shutdown()
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -43,10 +46,11 @@ async def root():
         "openapi_json": f"{settings.API_V1_STR}/openapi.json",
     }
 
+
 @app.get("/debug")
 async def dbg():
     print("debug entry hit")
     from app.worker.scraper import scraper
-    await scraper.scrape(7)
 
-
+    # await scraper.scrape(7)
+    await scraper.test(7)

@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from pydantic_settings import BaseSettings
+from pydantic.types import SecretStr
 
 
 class Settings(BaseSettings):
@@ -22,19 +23,19 @@ class Settings(BaseSettings):
         # cf https://github.com/supabase/supavisor/issues/287
         return (
             {
-                "prepared_statement_cache_size": 0,  
+                "prepared_statement_cache_size": 0,
                 "statement_cache_size": 0,
-                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",  
+                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
             }
             if "supabase.com:6543" in self.DATABASE_URL
             else {}
         )
 
     # App settings
-    APP_NAME: str = "Court Events API"
+    APP_NAME: str = "tomorrows-news"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
-    PYTHONASYNCIODEBUG : bool = False
+    PYTHONASYNCIODEBUG: bool = False
 
     # API settings
     API_V1_STR: str = "/api/v1"
@@ -49,6 +50,14 @@ class Settings(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
     CORS_ALLOW_HEADERS: list[str] = ["*"]
+
+    OPENROUTER_API_KEY : SecretStr
+    OPENROUTER_BASE_URL : str = ""
+
+    LANGSMITH_API_KEY : SecretStr
+    LANGSMITH_TRACING : bool = True
+
+    TAVILY_API_KEY : SecretStr
 
     class Config:
         env_file = ".env"
