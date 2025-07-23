@@ -7,3 +7,5 @@
 
 TODO:
 1. When new ScrapingSources get created, don't just check for identical URLs in the db, but similar ones like http://abc.com vs http://abc.com/
+2. When extracting sources, newspaper4k sometimes fails to find article.publish_date, even though it is there. This happens e.g. for beck-aktuell articles. Those articles currently get discarded, because we can't verify that they were published since the last scraping run. In the future, try to add additional logic, e.g. by trying to discover the article in a rss feed, custom html/url/header parsing, etc, to ascertain publication date when newspaper4k can't.
+3. Is extracting links via LLM really any better than extracting them via beautifulsoup? Test performance of different models in extracting (only/all) relevant links

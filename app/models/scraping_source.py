@@ -71,10 +71,11 @@ class ScrapingSource(Base):
             from apscheduler.triggers.interval import IntervalTrigger
 
             from app.worker.scheduler import scheduler
-            from app.worker.scraper import scraper
+            from app.worker.scraper import Scraper  
 
+            print(f"Scheduling job for source {self.id}")
             scheduler.add_job(
-                func=scraper.scrape,
+                func=Scraper.scrape_source,
                 args=[self.id],
                 trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 id=self.job_id,

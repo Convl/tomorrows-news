@@ -50,7 +50,6 @@ async def root():
 @app.get("/debug")
 async def dbg():
     print("debug entry hit")
-    from app.worker.scraper import scraper
-
-    # await scraper.scrape(7)
-    await scraper.test(7)
+    from app.worker.scraper import Scraper
+    scraper = Scraper(7)
+    await scraper.scrape()

@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     LANGSMITH_API_KEY : SecretStr
     LANGSMITH_TRACING : bool = True
+    LANGSMITH_PROJECT : str = "tomorrows-news"
 
     TAVILY_API_KEY : SecretStr
 

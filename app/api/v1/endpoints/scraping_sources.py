@@ -11,7 +11,6 @@ from app.models.scraping_source import ScrapingSource
 from app.models.topic import Topic
 from app.schemas.scraping_source import ScrapingSourceCreate, ScrapingSourceResponse, ScrapingSourceUpdate
 from app.worker.scheduler import scheduler
-from app.worker.scraper import scraper
 
 router = APIRouter()
 
@@ -49,14 +48,6 @@ async def create_scraping_source(source: ScrapingSourceCreate, db: AsyncSession 
     db.add(db_source)
     await db.commit()
     await db.refresh(db_source)
-    
-    # scheduler.add_job(
-    #     func=scraper.scrape,
-    #     args=[db_source.id],
-    #     trigger=IntervalTrigger(minutes=db_source.scraping_frequency),
-    #     id=f"scraping_source_{db_source.id}",
-    #     jobstore="scraping"
-    # )
     return db_source
 
 
