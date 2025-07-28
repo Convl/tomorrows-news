@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
-from .event_source import EventSourceResponse
+from .extracted_event import ExtractedEventResponse
 
 
 class EventBase(BaseModel):
@@ -48,7 +48,7 @@ class EventResponse(EventBase):
     created_at: datetime
     updated_at: datetime
     topic_id: int
-    event_sources: List[EventSourceResponse] = []
+    event_sources: List[ExtractedEventResponse] = []
 
     class Config:
         from_attributes = True

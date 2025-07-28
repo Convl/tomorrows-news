@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from sqlalchemy import select
 
 from app.database import get_db_session
-from app.models.scraping_source import ScrapingSource
-from app.models.topic import Topic
+from app.models.scraping_source import ScrapingSourceDB
+from app.models.topic import TopicDB
 from app.worker.scraper import scraper
 
 

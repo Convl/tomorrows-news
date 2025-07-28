@@ -16,8 +16,8 @@ import asyncio
 from sqlalchemy import select
 
 from app.database import get_db_session
-from app.models.scraping_source import ScrapingSource
-from app.models.topic import Topic
+from app.models.scraping_source import ScrapingSourceDB
+from app.models.topic import TopicDB
 from app.worker.scraper import scraper
 
 
@@ -38,8 +38,8 @@ def start_ipython():
     user_ns = {
         "get_db_session": get_db_session,
         "scraper": scraper,
-        "ScrapingSource": ScrapingSource,
-        "Topic": Topic,
+        "ScrapingSource": ScrapingSourceDB,
+        "Topic": TopicDB,
         "select": select,
         "asyncio": asyncio,
     }

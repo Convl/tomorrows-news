@@ -8,10 +8,10 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.topic import Topic
+    from app.models.topic import TopicDB
 
 
-class User(Base):
+class UserDB(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -27,4 +27,4 @@ class User(Base):
     )
 
     # Relationships
-    topics: Mapped[List["Topic"]] = relationship("Topic", back_populates="user", cascade="all, delete-orphan")
+    topics: Mapped[List["TopicDB"]] = relationship("TopicDB", back_populates="user", cascade="all, delete-orphan")

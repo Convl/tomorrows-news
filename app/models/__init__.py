@@ -1,7 +1,7 @@
-from .event import Event
-from .event_source import EventSource
-from .scraping_source import ScrapingSource
-from .topic import Topic
-from .user import User
+from .event import EventDB
+from .extracted_event import ExtractedEventDB
+from .scraping_source import ScrapingSourceDB
+from .topic import TopicDB
+from .user import UserDB
 
-__all__ = ["User", "Topic", "Event", "ScrapingSource", "EventSource"]
+__all__ = ["UserDB", "TopicDB", "EventDB", "ScrapingSourceDB", "ExtractedEventDB"]

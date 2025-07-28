@@ -8,12 +8,13 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.event import Event
-    from app.models.scraping_source import ScrapingSource
-    from app.models.user import User
+    from app.models.event import EventDB
+    from app.models.extracted_event import ExtractedEventDB
+    from app.models.scraping_source import ScrapingSourceDB
+    from app.models.user import UserDB
 
 
-class Topic(Base):
+class TopicDB(Base):
     __tablename__ = "topics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -31,8 +32,11 @@ class Topic(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="topics")
-    events: Mapped[List["Event"]] = relationship("Event", back_populates="topic", cascade="all, delete-orphan")
-    scraping_sources: Mapped[List["ScrapingSource"]] = relationship(
-        "ScrapingSource", back_populates="topic", cascade="all, delete-orphan"
+    user: Mapped["UserDB"] = relationship("UserDB", back_populates="topics")
+    events: Mapped[List["EventDB"]] = relationship("EventDB", back_populates="topic", cascade="all, delete-orphan")
+    extracted_events: Mapped[List["ExtractedEventDB"]] = relationship(
+        "ExtractedEventDB", back_populates="topic", cascade="all, delete-orphan"
+    )
+    scraping_sources: Mapped[List["ScrapingSourceDB"]] = relationship(
+        "ScrapingSourceDB", back_populates="topic", cascade="all, delete-orphan"
     )

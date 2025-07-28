@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.event import Event
+from app.models.event import EventDB
 from app.schemas.event import EventCreate, EventResponse, EventSummary, EventUpdate
 
 router = APIRouter()

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from sqlalchemy import select
 
 from app.database import get_db_session
-from app.models.scraping_source import ScrapingSource
+from app.models.scraping_source import ScrapingSourceDB
 from app.worker.scraper import scraper
 
 
@@ -27,7 +27,7 @@ async def test_scraper(source_id: int = 5):
 async def list_sources():
     """List all scraping sources"""
     async with get_db_session() as db:
-        sources = (await db.execute(select(ScrapingSource))).scalars().all()
+        sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()
         for source in sources:
             print(f"ID: {source.id}, Name: {source.name}, URL: {source.base_url}")
 

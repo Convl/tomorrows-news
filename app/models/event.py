@@ -1,72 +1,85 @@
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+from app.worker.scraping_models import AdditionalInfo
 
 if TYPE_CHECKING:
-    from app.models.event_source import EventSource
-    from app.models.topic import Topic
+    from app.models.extracted_event import ExtractedEventDB
+    from app.models.topic import TopicDB
 
 
-class Event(Base):
+class EventDB(Base):
+    """The consolidated version of all ExtractedEvents for a given real-world event."""
+
     __tablename__ = "events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Fields that mirror ExtractedEvent
     title: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    event_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-
-    # Generic event information
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    event_type: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
-    )  # e.g., "hearing", "conference", "deadline", "announcement"
+    significance: Mapped[float] = mapped_column(Float, nullable=False)
+    duration: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    additional_infos: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
 
-    # Flexible custom fields for domain-specific data
-    custom_fields: Mapped[Dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )  # e.g., {"court_name": "District Court", "case_number": "ABC-123"}
-    custom_fields_config: Mapped[Dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )  # Configuration for which fields to use in deduplication
-    # Example config: {"court_name": {"use_in_deduplication": true, "weight": 0.8}, "case_number": {"use_in_deduplication": true, "weight": 1.0}}
+    @property
+    def additional_infos_list(self) -> list[AdditionalInfo] | None:
+        """Convert JSON back to list[AdditionalInfo]."""
+        return [AdditionalInfo(**item) for item in self.additional_infos] if self.additional_infos else None
 
-    # Source information
-    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    @additional_infos_list.setter
+    def additional_infos_list(self, value: list[AdditionalInfo] | None):
+        """Convert list[AdditionalInfo] to JSON for storage."""
+        self.additional_infos = [item.model_dump() for item in value] if value else None
 
-    # Deduplication fields
-    embedding_vector: Mapped[str | None] = mapped_column(Text, nullable=True)  # Store vector embedding as text
-    similarity_hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
-    )  # For quick similarity checks
+    # Provenance fields. Title and description may be composites. Location and duration are optional.
+    title_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
+    description_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
+    date_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
+    location_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
+    duration_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
 
-    # Status fields
-    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False)
-    duplicate_of_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("events.id"), nullable=True)
+    # Confidence
+    confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
 
-    # Metadata
-    processing_notes: Mapped[str | None] = mapped_column(Text, nullable=True)  # Notes from AI processing
+    # Vector embedding for deduplication and similarity search
+    semantic_vector: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    update_history: Mapped[list[datetime]] = mapped_column(JSON, nullable=False, default=list)
 
-    # Foreign keys
+    # Topic (parent)
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="events")
 
-    # Relationships
-    topic: Mapped["Topic"] = relationship("Topic", back_populates="events")
-    event_sources: Mapped[List["EventSource"]] = relationship(
-        "EventSource", back_populates="event", cascade="all, delete-orphan"
+    # Extracted Events (children)
+    extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
+        "ExtractedEventDB",
+        back_populates="event",
+        cascade="all, delete-orphan",
+        foreign_keys="ExtractedEventDB.event_id",
     )
-    duplicate_of: Mapped["Event | None"] = relationship("Event", remote_side=[id], back_populates="duplicates")
-    duplicates: Mapped[List["Event"]] = relationship(
-        "Event", remote_side=[duplicate_of_id], back_populates="duplicate_of"
-    )
+
+    @classmethod
+    def from_extracted_event_db(cls, extracted_event_db: "ExtractedEventDB") -> "EventDB":
+        """Convert Pydantic ExtractedEvent to SQLAlchemy EventDB."""
+        return cls(
+            title=extracted_event_db.title,
+            description=extracted_event_db.description,
+            date=extracted_event_db.date,
+            location=extracted_event_db.location,
+            significance=extracted_event_db.significance,
+            duration=extracted_event_db.duration,
+            additional_infos=extracted_event_db.additional_infos,
+            semantic_vector=extracted_event_db.semantic_vector,
+            topic_id=extracted_event_db.topic_id,
+        )

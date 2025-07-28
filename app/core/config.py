@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from pydantic_settings import BaseSettings
 from pydantic.types import SecretStr
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     def SYNC_DATABASE_URL(self) -> str:
         "Sync version of the db url, needed for APScheduler"
         return self.DATABASE_URL.replace("+asyncpg", "")
+
+    @property
+    def PSYCOPG3_DATABASE_URL(self) -> str:
+        """Plain PostgreSQL URL for LangGraph AsyncPostgresSaver (psycopg3)"""
+        # Remove SQLAlchemy driver specification for psycopg3
+        return self.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
 
     @property
     def CONNECT_ARGS(self) -> dict:
@@ -51,14 +57,16 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: list[str] = ["*"]
     CORS_ALLOW_HEADERS: list[str] = ["*"]
 
-    OPENROUTER_API_KEY : SecretStr
-    OPENROUTER_BASE_URL : str = ""
+    OPENROUTER_API_KEY: SecretStr
+    OPENROUTER_BASE_URL: str = ""
 
-    LANGSMITH_API_KEY : SecretStr
-    LANGSMITH_TRACING : bool = True
-    LANGSMITH_PROJECT : str = "tomorrows-news"
+    OPENAI_API_KEY: SecretStr
 
-    TAVILY_API_KEY : SecretStr
+    LANGSMITH_API_KEY: SecretStr
+    LANGSMITH_TRACING: bool = True
+    LANGSMITH_PROJECT: str = "tomorrows-news"
+
+    TAVILY_API_KEY: SecretStr
 
     class Config:
         env_file = ".env"

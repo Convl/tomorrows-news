@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.worker.scheduler import scheduler
 
+logging.getLogger("asyncio").setLevel(logging.ERROR)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,4 +54,5 @@ async def dbg():
     print("debug entry hit")
     from app.worker.scraper import Scraper
     scraper = Scraper(7)
-    await scraper.scrape()
+    # await scraper.scrape()
+    await scraper.test("Entscheidung des OVG Greifswald zum Festival in Jamel und Reaktion des Landkreises")

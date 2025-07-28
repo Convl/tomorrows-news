@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.scraping_source import ScrapingSource
-from app.models.topic import Topic
+from app.models.scraping_source import ScrapingSourceDB
+from app.models.topic import TopicDB
 from app.schemas.scraping_source import ScrapingSourceCreate, ScrapingSourceResponse, ScrapingSourceUpdate
 from app.worker.scheduler import scheduler
 
@@ -23,7 +23,7 @@ async def create_scraping_source(source: ScrapingSourceCreate, db: AsyncSession 
     topic = (
         (
             await db.execute(
-                select(Topic).options(selectinload(Topic.scraping_sources)).where(Topic.id == source.topic_id)
+                select(TopicDB).options(selectinload(TopicDB.scraping_sources)).where(TopicDB.id == source.topic_id)
             )
         )
         .scalars()
@@ -43,8 +43,7 @@ async def create_scraping_source(source: ScrapingSourceCreate, db: AsyncSession 
             detail="Source with this source_type and base_url already exists for this topic.",
         )
 
-
-    db_source = ScrapingSource(**source.model_dump())
+    db_source = ScrapingSourceDB(**source.model_dump())
     db.add(db_source)
     await db.commit()
     await db.refresh(db_source)
@@ -55,7 +54,11 @@ async def create_scraping_source(source: ScrapingSourceCreate, db: AsyncSession 
 async def list_scraping_sources(*, skip: int = 0, limit: int = 100, topic_id: int, db: AsyncSession = Depends(get_db)):
     """List scraping sources for a specific topic with pagination"""
     sources = (
-        (await db.execute(select(ScrapingSource).where(ScrapingSource.topic_id == topic_id).offset(skip).limit(limit)))
+        (
+            await db.execute(
+                select(ScrapingSourceDB).where(ScrapingSourceDB.topic_id == topic_id).offset(skip).limit(limit)
+            )
+        )
         .scalars()
         .all()
     )
@@ -66,7 +69,7 @@ async def list_scraping_sources(*, skip: int = 0, limit: int = 100, topic_id: in
 @router.get("/{source_id}", response_model=ScrapingSourceResponse)
 async def get_scraping_source(source_id: int, db: AsyncSession = Depends(get_db)):
     """Get a scraping source by ID"""
-    source = (await db.execute(select(ScrapingSource).where(ScrapingSource.id == source_id))).scalars().first()
+    source = (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == source_id))).scalars().first()
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
     return source
@@ -77,7 +80,7 @@ async def update_scraping_source(
     source_id: int, source_update: ScrapingSourceUpdate, db: AsyncSession = Depends(get_db)
 ):
     """Update a scraping source"""
-    source = (await db.execute(select(ScrapingSource).where(ScrapingSource.id == source_id))).scalars().first()
+    source = (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == source_id))).scalars().first()
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
 
@@ -93,7 +96,7 @@ async def update_scraping_source(
 @router.delete("/{source_id}")
 async def delete_scraping_source(source_id: int, db: AsyncSession = Depends(get_db)):
     """Delete a scraping source"""
-    source = (await db.execute(select(ScrapingSource).where(ScrapingSource.id == source_id))).scalars().first()
+    source = (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == source_id))).scalars().first()
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
 

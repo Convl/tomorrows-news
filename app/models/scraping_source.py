@@ -12,10 +12,11 @@ from app.core.enums import ScrapingSourceEnum, get_enum_values
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.topic import Topic
+    from app.models.extracted_event import ExtractedEventDB
+    from app.models.topic import TopicDB
 
 
-class ScrapingSource(Base):
+class ScrapingSourceDB(Base):
     """User-configured sources that should be monitored for relevant events"""
 
     __tablename__ = "scraping_sources"
@@ -31,6 +32,9 @@ class ScrapingSource(Base):
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "de", "en"
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    degrees_of_separation: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )  # how many degrees away from the original source to look for events
 
     # Configuration
     scraping_config: Mapped[Dict[str, Any] | None] = mapped_column(
@@ -44,7 +48,12 @@ class ScrapingSource(Base):
 
     # Topic relationship
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
-    topic: Mapped["Topic"] = relationship("Topic", back_populates="scraping_sources")
+    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="scraping_sources")
+
+    # ExtractedEvents extracted via this ScrapingSource
+    extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
+        "ExtractedEventDB", back_populates="scraping_source", cascade="all, delete-orphan"
+    )
 
     # Timestamps
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -71,7 +80,7 @@ class ScrapingSource(Base):
             from apscheduler.triggers.interval import IntervalTrigger
 
             from app.worker.scheduler import scheduler
-            from app.worker.scraper import Scraper  
+            from app.worker.scraper import Scraper
 
             print(f"Scheduling job for source {self.id}")
             scheduler.add_job(
@@ -119,13 +128,13 @@ class ScrapingSource(Base):
 
 
 # SQLAlchemy event listeners to automatically manage jobs
-@event.listens_for(ScrapingSource, "after_insert")
-def schedule_job_after_insert(mapper, connection, target: ScrapingSource):
+@event.listens_for(ScrapingSourceDB, "after_insert")
+def schedule_job_after_insert(mapper, connection, target: ScrapingSourceDB):
     target.schedule_job()
 
 
-@event.listens_for(ScrapingSource, "after_update")
-def update_job_after_update(mapper, connection, target: ScrapingSource):
+@event.listens_for(ScrapingSourceDB, "after_update")
+def update_job_after_update(mapper, connection, target: ScrapingSourceDB):
     """Automatically update job after ScrapingSource is modified"""
     # Check if relevant fields changed
     state = target.__dict__
@@ -142,8 +151,8 @@ def update_job_after_update(mapper, connection, target: ScrapingSource):
             target.update_job()
 
 
-@event.listens_for(ScrapingSource, "after_delete")
-def remove_job_after_delete(mapper, connection, target: ScrapingSource):
+@event.listens_for(ScrapingSourceDB, "after_delete")
+def remove_job_after_delete(mapper, connection, target: ScrapingSourceDB):
     """Automatically remove job after ScrapingSource is deleted"""
     # Not sure if the commit will destroy the target (or set its id to None), so best to grab the id / jobstore before
     # and use a custom function below instead of calling a delete_job method on the target

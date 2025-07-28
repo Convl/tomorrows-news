@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import UserDB
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 router = APIRouter()
@@ -15,12 +15,12 @@ router = APIRouter()
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     """Create a new user"""
 
-    if (await db.execute(select(User).where(User.email == user.email))).scalars().first():
+    if (await db.execute(select(UserDB).where(UserDB.email == user.email))).scalars().first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this email already exists")
 
     user_data = user.model_dump(exclude={"password"})
     user_data["hashed_password"] = "mock password hash"  # TODO integrate password hashing
-    db_user = User(**user_data)
+    db_user = UserDB(**user_data)
 
     db.add(db_user)
     await db.commit()
@@ -39,7 +39,7 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
 @router.get("/", response_model=List[UserResponse])
 async def list_users(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     """List all users, up to the limit"""
-    users = (await db.execute(select(User).offset(skip).limit(limit))).scalars().all()
+    users = (await db.execute(select(UserDB).offset(skip).limit(limit))).scalars().all()
     return users
 
 

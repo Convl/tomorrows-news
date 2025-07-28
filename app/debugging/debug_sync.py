@@ -40,7 +40,7 @@ def debug_scrape_sync(source_id: int):
     from sqlalchemy.orm import sessionmaker
 
     from app.core.config import Settings
-    from app.models.scraping_source import ScrapingSource
+    from app.models.scraping_source import ScrapingSourceDB
 
     settings = Settings()
     # Create sync engine from async URL
@@ -49,7 +49,9 @@ def debug_scrape_sync(source_id: int):
     Session = sessionmaker(engine)
 
     with Session() as session:
-        source = session.execute(select(ScrapingSource).where(ScrapingSource.id == source_id)).scalars().one_or_none()
+        source = (
+            session.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == source_id)).scalars().one_or_none()
+        )
         if not source:
             print(f"Source with id {source_id} not found.")
             return
