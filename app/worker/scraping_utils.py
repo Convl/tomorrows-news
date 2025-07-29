@@ -17,14 +17,15 @@ def struct_time_to_datetime(struct_time_obj) -> datetime | None:
     if struct_time_obj is None:
         return None
     try:
-        # Direct conversion since feedparser's struct_time is UTC
+        # Feedparser converts dates to UTC before converting them into tz-naive struct_time objects, so we can safely set UTC for the datetime object
         utc_dt = datetime(*struct_time_obj[:6], tzinfo=timezone.utc)
-        return utc_dt.astimezone()
+        return utc_dt
     except (ValueError, TypeError):
         return None
 
 
 async def web_sources_from_scraping_source(scraping_source: ScrapingSourceWorkflow) -> list[WebSourceWithMarkdown]:
+    scraping_source._visited = True
     match scraping_source.source_type:
         case ScrapingSourceEnum.WEBPAGE:
             if scraping_source.degrees_of_separation == 0:
@@ -33,13 +34,13 @@ async def web_sources_from_scraping_source(scraping_source: ScrapingSourceWorkfl
                 return await extract_sources_from_web(
                     scraping_source.base_url,
                     last_scraped_at=scraping_source.last_scraped_at,
-                    degrees_of_separation=scraping_source.degrees_of_separation + 1,
+                    degrees_of_separation=1,
                 )
         case ScrapingSourceEnum.RSS:
             return await extract_sources_from_rss(
                 scraping_source.base_url,
                 scraping_source.last_scraped_at,
-                degrees_of_separation=scraping_source.degrees_of_separation + 1,
+                degrees_of_separation=1,
             )
         case _:
             raise ValueError(f"Unsupported source type: {scraping_source.source_type}")
@@ -83,18 +84,14 @@ async def extract_sources_from_rss(url: str, last_scraped_at: datetime, degrees_
         if hasattr(entry, "updated_parsed") and entry.updated_parsed:
             updated_dt = struct_time_to_datetime(entry.updated_parsed)
 
-        # Use the more recent date, fallback to a default if neither exists
+        # Use the more recent date
         if published_dt and updated_dt:
             date = max(published_dt, updated_dt)
-        elif published_dt:
-            date = published_dt
-        elif updated_dt:
-            date = updated_dt
         else:
-            # Skip entries without valid dates
-            continue
+            date = updated_dt or published_dt
 
-        if date < last_scraped_at:
+        # Skip entries without valid dates or that have already been scraped
+        if date is None or date < last_scraped_at:
             continue
 
         # Use the RSS feed date instead of letting the function parse the article date
@@ -132,7 +129,7 @@ async def download_and_parse_article(
             if article.publish_date.tzinfo is None:
                 date = article.publish_date.replace(tzinfo=timezone.utc)
             else:
-                date = article.publish_date
+                date = article.publish_date.astimezone(timezone.utc)
         else:
             # Skip articles without valid dates
             return None

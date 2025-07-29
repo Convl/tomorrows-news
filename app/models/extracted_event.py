@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import TYPE_CHECKING, Any, Dict
 
 import pytz
@@ -76,9 +76,15 @@ class ExtractedEventDB(Base):
         # Get all the base event fields, handle the nested source
         event_data = extracted_event.model_dump()
         source_data = event_data.pop("source")
-        event_date = event_data.pop("date")
-        event_country_code = event_data.pop("country_code")
 
+        # If event only has a date and no time, set it to midnight
+        event_date = event_data.pop("date")
+        if isinstance(event_date, date) and not isinstance(event_date, datetime):
+            event_date = datetime.combine(event_date, datetime.time(0, 0, 0))
+
+        # Localize event date to the timezone of the country where the event takes place, or UTC as a fallback
+        event_country_code = event_data.pop("country_code")
+        event_country_timezone = timezone.utc
         try:
             # try getting timezone from country as inferred by LLM
             event_countries_list = pytz.country_timezones[event_country_code.upper()]
@@ -90,18 +96,29 @@ class ExtractedEventDB(Base):
                     event_countries_list = pytz.country_timezones[scraping_source.country.upper()]
                     event_country_timezone = pytz.timezone(event_countries_list[0])
                 except Exception:
-                    event_country_timezone = timezone.utc
+                    pass
             else:
-                event_country_timezone = timezone.utc
+                pass
+        
+        if event_date.tzinfo:
+            event_date = event_date.replace(tzinfo=None)
+        event_date = event_country_timezone.localize(event_date)
 
-        event_date = event_date.replace(tzinfo=event_country_timezone)
+        # Localize source published date to UTC
+        source_published_date = source_data["date"]
+        if source_published_date.tzinfo is None:
+            # Assume naive dates are UTC
+            source_published_date = source_published_date.replace(tzinfo=timezone.utc)
+        else:
+            # Convert to UTC
+            source_published_date = source_published_date.astimezone(timezone.utc)
 
         return cls(
             **event_data,
             date=event_date,
             source_url=source_data["url"],
             source_title=source_data["title"],
-            source_published_date=source_data["date"],
+            source_published_date=source_published_date,
             degrees_of_separation=source_data["degrees_of_separation"],
             scraping_source_id=scraping_source.id,
             topic_id=scraping_source.topic_id,

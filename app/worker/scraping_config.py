@@ -1,8 +1,5 @@
 from langchain_core.prompts import SystemMessagePromptTemplate
 
-# Configuration constants
-MAX_DEGREES_OF_SEPARATION = 1
-
 # Template for event extraction system message
 EVENT_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
@@ -35,5 +32,20 @@ Do not change anything about the links that you extracted, like replacing hyphen
 Topic name: {topic_name}
 Topic description: {topic_description}
 Topic country: {topic_country}
+"""
+)
+EVENT_MERGE_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
+    """
+You will be given the title and description of two events. 
+Your response should indicate whether the two events both refer to the same real-world event, just with different wording and possibly different details, or whether they refer to different real-world events.
+If they refer to different real-world events, leave the other fields in your response blank.
+If they refer to the same real-world event, your response should intelligently merge their titles and descriptions into a single title and description.
+When merging, try to preserve the most important information from both events.
+However, if there is contradictory information, you should prioritize the information from the second event.
+
+Title of first event: {title_1}
+Description of first event: {description_1}
+Title of second event: {title_2}
+Description of second event: {description_2}
 """
 )

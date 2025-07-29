@@ -26,7 +26,7 @@ from app.schemas.topic import TopicBase
 
 from .scraping_config import (
     EVENT_EXTRACTION_SYSTEM_TEMPLATE,
-    MAX_DEGREES_OF_SEPARATION,
+    EVENT_MERGE_SYSTEM_TEMPLATE,
     SOURCE_EXTRACTION_SYSTEM_TEMPLATE,
 )
 from .scraping_models import (
@@ -34,6 +34,7 @@ from .scraping_models import (
     ExtractedEvent,
     ExtractedEventBase,
     ExtractedUrls,
+    EventMergeResponse,
     ScrapingSourceWorkflow,
     ScrapingState,
     WebSourceBase,
@@ -46,71 +47,181 @@ from .scraping_utils import (
     web_sources_from_scraping_source,
 )
 
-CONSIDER_SAME_EVENT_THRESHOLD = 0.8
+CONSIDER_SAME_EVENT_THRESHOLD = 0.7
 CONSIDER_NEW_DATE_TRUE_THRESHOLD = 3
+CONSIDER_NEW_DURATION_TRUE_THRESHOLD = 3
+CONSIDER_NEW_LOCATION_TRUE_THRESHOLD = 3
 
 
 class Scraper:
     def __init__(self, source_id):
         self.sources = []
-        self.source_id = source_id
+        self.scraping_source_id = source_id
 
-    async def resolve_date_conflict(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
-        """Resolve date conflicts between an EventDB and an ExtractedEventDB."""
-        if event_db.date == extracted_event_db.date:
-            return
+    async def calculate_evidence_score(evidence_list: list[ExtractedEventDB]) -> float:
+        """Calculate weighted score for a list of evidence based on recency."""
+        if not evidence_list:
+            return 0.0
 
-        evidence_for_old_date = (
+        now = datetime.now(timezone.utc)
+        score = 0.0
+
+        for evidence in evidence_list:
+            # Calculate fractional age in days
+            age = (now - evidence.source_published_date).total_seconds() / (24 * 3600)
+            # Exponential decay: newer sources get higher weight. Half-life of 30 days (score becomes 0.5 after 30 days)
+            value = 0.5 ** (age / 30.0)
+            score += value
+
+        return score
+
+    async def resolve_evidence_based_conflict(
+        self,
+        event_db: EventDB,
+        extracted_event_db: ExtractedEventDB,
+        db: AsyncSession,
+        field_name: str,
+        from_field_name: str,
+        threshold: int = 3,
+    ):
+        """Generic evidence-based conflict resolution for any field."""
+        old_value = getattr(event_db, field_name)
+        new_value = getattr(extracted_event_db, field_name)
+
+        # Query evidence for old value
+        evidence_for_old_value = (
             (
                 await db.execute(
                     select(ExtractedEventDB)
                     .where(ExtractedEventDB.event_id == event_db.id)
-                    .where(ExtractedEventDB.date == event_db.date)
+                    .where(getattr(ExtractedEventDB, field_name) == old_value)
                 )
             )
             .scalars()
             .all()
         )
 
-        evidence_for_new_date = (
+        # Query evidence for new value
+        evidence_for_new_value = (
             (
                 await db.execute(
                     select(ExtractedEventDB)
                     .where(ExtractedEventDB.event_id == event_db.id)
-                    .where(ExtractedEventDB.date == extracted_event_db.date)
+                    .where(getattr(ExtractedEventDB, field_name) == new_value)
                 )
             )
             .scalars()
             .all()
         )
 
-        # If at least CONSIDER_NEW_DATE_TRUE_THRESHOLD of the most recent events agree on the new date, accept it as true
-        recent_evidence_for_new_date = [
+        # Check if recent evidence for new value meets threshold
+        recent_evidence_for_new_value = [
             new_evidence
-            for new_evidence in evidence_for_new_date
+            for new_evidence in evidence_for_new_value
             if all(
                 new_evidence.source_published_date > old_evidence.source_published_date
-                for old_evidence in evidence_for_old_date
+                for old_evidence in evidence_for_old_value
             )
         ]
-        if len(recent_evidence_for_new_date) >= CONSIDER_NEW_DATE_TRUE_THRESHOLD:
-            event_db.date = extracted_event_db.date
-            event_db.date_from_id = extracted_event_db.id
+        if len(recent_evidence_for_new_value) >= threshold:
+            setattr(event_db, field_name, new_value)
+            setattr(event_db, from_field_name, extracted_event_db.id)
+            db.add(event_db)
+            await db.flush()
+            return
+
+        # Calculate evidence scores and update if new evidence is stronger
+        evidence_for_old_value_score = await self.calculate_evidence_score(evidence_for_old_value)
+        evidence_for_new_value_score = await self.calculate_evidence_score(evidence_for_new_value)
+        if evidence_for_new_value_score > evidence_for_old_value_score:
+            setattr(event_db, field_name, new_value)
+            setattr(event_db, from_field_name, extracted_event_db.id)
             db.add(event_db)
             await db.flush()
 
-        # Otherwise, calculate scores that takes into account number of ExtractedEventDBs suggesting the old and the new date and the age of their respective .source_published_date (older = worse)
-        evidence_for_old_date_score = ...
-        evidence_for_new_date_score = ...
+    async def resolve_date_conflict(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
+        """Resolve date conflicts between an EventDB and an ExtractedEventDB."""
+        # If the dates are the same, do nothing
+        if event_db.date == extracted_event_db.date:
+            return
 
-        # if len(evidence_for_new_date) >= CONSIDER_NEW_DATE_TRUE_THRESHOLD:
-        #     event_db.date = extracted_event_db.date
-        #     db.add(event_db)
-        #     await db.flush()
+        # If the event does not specify a time (midnight effectively means 'no time', as pure dates get set to midnight in ExtractedEventDB.from_extracted_event), and the extracted event does, use the extracted event date
+        if event_db.date.date() == extracted_event_db.date.date():
+            if event_db.date.time() == datetime.time(0, 0, 0):
+                event_db.date = extracted_event_db.date
+                event_db.date_from_id = extracted_event_db.id
+                db.add(event_db)
+                await db.flush()
+                return
+
+        # Use generic evidence-based conflict resolution
+        await self.resolve_evidence_based_conflict(
+            event_db, extracted_event_db, db, "date", "date_from_id", CONSIDER_NEW_DATE_TRUE_THRESHOLD
+        )
+
+    async def resolve_duration_conflict(
+        self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession
+    ):
+        """Resolve duration conflicts between an EventDB and an ExtractedEventDB."""
+        # If both durations are identical or new event lacks duration info, do nothing
+        if event_db.duration == extracted_event_db.duration or extracted_event_db.duration is None:
+            return
+
+        # If new event has duration info, but old event does not, update old event
+        if event_db.duration is None:
+            event_db.duration = extracted_event_db.duration
+            event_db.duration_from_id = extracted_event_db.id
+            db.add(event_db)
+            await db.flush()
+            return
+
+        # Use generic evidence-based conflict resolution
+        await self.resolve_evidence_based_conflict(
+            event_db, extracted_event_db, db, "duration", "duration_from_id", CONSIDER_NEW_DURATION_TRUE_THRESHOLD
+        )
+
+    async def resolve_location_conflict(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
+        """Resolve location conflicts between an EventDB and an ExtractedEventDB."""
+        # If the locations are the same or the new event lacks location info, do nothing
+        if event_db.location == extracted_event_db.location or extracted_event_db.location is None:
+            return
+        
+        # Update the event if it currently has no location, or the new location merely adds information
+        if event_db.location is None or event_db.location in extracted_event_db.location:
+            event_db.location = extracted_event_db.location
+            event_db.location_from_id = extracted_event_db.id
+            db.add(event_db)
+            await db.flush()
+            return
+        
+        # Use generic evidence-based conflict resolution
+        await self.resolve_evidence_based_conflict(
+            event_db, extracted_event_db, db, "location", "location_from_id", CONSIDER_NEW_LOCATION_TRUE_THRESHOLD
+        )
+        
+    async def merge_events(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
+        """Merge an ExtractedEventDB into an EventDB."""
+        merge_message = await EVENT_MERGE_SYSTEM_TEMPLATE.aformat(
+            title_1=event_db.title,
+            description_1=event_db.description,
+            title_2=extracted_event_db.title,
+            description_2=extracted_event_db.description,
+        )
+        response = await self.event_merging_llm.ainvoke([merge_message])
 
     async def update_event_db(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
         """Update an EventDB with an ExtractedEventDB."""
-        self.resolve_date_conflict(event_db, extracted_event_db, db)
+        await self.resolve_date_conflict(event_db, extracted_event_db, db)
+        await self.resolve_duration_conflict(event_db, extracted_event_db, db)
+        await self.resolve_location_conflict(event_db, extracted_event_db, db)
+        for info in extracted_event_db.additional_infos:
+            if info in event_db.additional_infos:
+                event_db.additional_infos[info] += f"\n{extracted_event_db.additional_infos[info]}"
+            else:
+                event_db.additional_infos[info] = extracted_event_db.additional_infos[info]
+        db.add(event_db)
+        await db.flush()
+
 
     async def commit_extracted_events_to_db(self, state: ScrapingState):
         extracted_events_db = []
@@ -143,15 +254,15 @@ class Scraper:
                         .order_by(text("similarity DESC"))
                     )
                 ).all()
-                print(f"### Most similar events: for {extracted_event_db.title}")
+                print(f"### Most similar extracted events: for {extracted_event_db.title}")
                 for i, (event, similarity) in enumerate(most_similar_extracted_events):
-                    print(f"Similar event {i}: Cosine distance: {similarity}")
-                    print(f"Similar event {i}: {event.title}")
-                    print(f"Similar event {i}: {event.description}")
-                    print(f"Similar event {i}: {event.location}")
-                    print(f"Similar event {i}: {event.date}")
+                    print(f"Similar extracted event {i}: Cosine distance: {similarity}")
+                    print(f"Similar extracted event {i}: {event.title}")
+                    print(f"Similar extracted event {i}: {event.description}")
+                    print(f"Similar extracted event {i}: {event.location}")
+                    print(f"Similar extracted event {i}: {event.date}")
 
-                most_similar_event, similarity = (
+                event_with_similarity = (
                     await db.execute(
                         select(
                             EventDB,
@@ -163,25 +274,46 @@ class Scraper:
                         .order_by(text("similarity DESC"))
                         .limit(1)
                     )
-                ).all()
-                if most_similar_event and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
-                    print("### Similar event found:")
-                    print(f"Similar event: {most_similar_event.title}")
-                    print(f"Similar event: {most_similar_event.description}")
-                    extracted_event_db.event_id = most_similar_event.id
-                    db.add(extracted_event_db)
-                    await db.flush()
+                ).first()
+                event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
 
-                    break
-                else:
-                    print("### No similar event found, creating new event")
-                    new_event = EventDB.from_extracted_event_db(extracted_event_db)
-                    db.add(new_event)
-                    await db.flush()
-                    extracted_event_db.event_id = new_event.id
-                    db.add(extracted_event_db)
-                    await db.flush()
-                    break
+                if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
+                    print("### Similar event found, checking if LLM agrees")
+                    print(f"Extracted event title: {extracted_event_db.title}")
+                    print(f"Extracted event description: {extracted_event_db.description}")
+                    print(f"Similar event title: {event_db.title}")
+                    print(f"Similar event description: {event_db.description}")
+                    print(f"Cosine distance: {similarity}")
+                    
+                    merge_message = await EVENT_MERGE_SYSTEM_TEMPLATE.aformat(
+                        title_1=event_db.title,
+                        description_1=event_db.description,
+                        title_2=extracted_event_db.title,
+                        description_2=extracted_event_db.description,
+                    )
+                    response = await self.event_merging_llm.ainvoke([merge_message])
+                    parsed_response : EventMergeResponse = response["parsed"]
+                    if parsed_response.is_same_event:
+                        print("### LLM agrees, merging events")
+                        event_db.title = parsed_response.merged_title
+                        event_db.description = parsed_response.merged_description
+                        extracted_event_db.event_id = event_db.id
+                        db.add(event_db)
+                        db.add(extracted_event_db)
+                        await db.flush()
+                        await self.update_event_db(event_db, extracted_event_db, db)
+                        continue
+                    else:
+                        print("### LLM disagrees, new event will be created")
+                
+                # if we get here, no similar event was found, or the llm disagreed that it was similar
+                print("### No similar event found, creating new event")
+                new_event = EventDB.from_extracted_event_db(extracted_event_db)
+                db.add(new_event)
+                await db.flush()
+                extracted_event_db.event_id = new_event.id
+                db.add(extracted_event_db)
+                await db.flush()
             await db.commit()
 
     async def extract_sources_from_single_source(
@@ -192,6 +324,7 @@ class Scraper:
         # to skip this part, simply return {}
         source: WebSourceWithMarkdown = state["source"]
         try:
+            source._visited = True
             print(f"Processing source: {source.url}")
             messages = [
                 self.source_extraction_system_message,
@@ -218,7 +351,10 @@ class Scraper:
 
     async def start_source_extraction(self, state: ScrapingState):
         """Initial node that populates state.sources from the scraping source."""
-        return {"sources": await web_sources_from_scraping_source(state.scraping_source)}
+        if not state.sources and not state.scraping_source._visited:
+            return {"sources": await web_sources_from_scraping_source(state.scraping_source)}
+        else:
+            return {}
 
     async def route_to_source_extraction(self, state: ScrapingState):
         """Route to source extraction for parallel processing."""
@@ -226,29 +362,32 @@ class Scraper:
         eligible_sources = [
             source
             for source in state.sources
-            if source.degrees_of_separation < state.scraping_source.degrees_of_separation
-            and source.degrees_of_separation < MAX_DEGREES_OF_SEPARATION
+            if source.degrees_of_separation < state.scraping_source.degrees_of_separation and not source._visited
         ]
-        print(f"Initial state has {len(state.sources)} sources")
-        print(f"Routing {len(eligible_sources)} sources for source extraction (degrees < {state.scraping_source.degrees_of_separation})")
+        print(f"State has {len(state.sources)} sources")
 
-        if not eligible_sources:
-            print("No eligible sources for extraction - skipping to event extraction")
-            return []
-
-        return [Send("extract_sources_from_single_source", {"source": source}) for source in eligible_sources]
+        if eligible_sources:
+            print(f"Routing {len(eligible_sources)} eligible sources to source extraction")
+            return [Send("extract_sources_from_single_source", {"source": source}) for source in eligible_sources]
+        else:
+            print("No eligible sources for extraction, proceeding to event extraction")
+            return "prepare_event_extraction"
 
     async def extract_events_from_single_source(self, state: dict[str, WebSourceWithMarkdown]):
         """Extract events from a single source."""
-        source = state["source"]  # Extract the source from the state dict
+        source = state["source"]
         print(f"Extracting events from source: {source.url}")
         messages = [
             self.event_extraction_system_message,
             HumanMessage(f"Extract events from the following webpage: {source.markdown}"),
         ]
-        response = await self.event_extracting_llm.ainvoke(messages)
-        events: list[ExtractedEventBase] = response["parsed"].events
-        print(f"Extracted {len(events)} events from {source.url}")
+        try:
+            response = await self.event_extracting_llm.ainvoke(messages)
+            events: list[ExtractedEventBase] = response["parsed"].events
+            print(f"Extracted {len(events)} events from {source.url}")
+        except Exception as e:
+            print(f"ERROR in extract_events_from_single_source for {source.url}: {e}")
+            return {"events": []}
 
         source_without_markdown = WebSourceBase.from_web_source_with_markdown(source)
         events_with_source = [ExtractedEvent(**event.model_dump(), source=source_without_markdown) for event in events]
@@ -324,12 +463,12 @@ class Scraper:
     async def _prepare_scraper(self, checkpointer: AsyncPostgresSaver | None = None):
         async with get_db_session() as db:
             self.scraping_source: ScrapingSourceDB = (
-                (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == self.source_id)))
+                (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == self.scraping_source_id)))
                 .scalars()
                 .one_or_none()
             )
             if not self.scraping_source:
-                raise ValueError(f"Source with id {self.source_id} not found.")
+                raise ValueError(f"Source with id {self.scraping_source_id} not found.")
 
             topic: TopicDB = (
                 (await db.execute(select(TopicDB).where(TopicDB.id == self.scraping_source.topic_id)))
@@ -394,6 +533,12 @@ class Scraper:
             include_raw=True,
             strict=True,
         )
+        self.event_merging_llm = self.llm.with_structured_output(
+            schema=EventMergeResponse,
+            method="json_schema",
+            include_raw=True,
+            strict=True,
+        )
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
@@ -424,11 +569,16 @@ class Scraper:
         self.graph_builder.add_conditional_edges(
             "start_source_extraction",
             self.route_to_source_extraction,
-            ["extract_sources_from_single_source"],
+            # ["extract_sources_from_single_source"],
+            {
+                "prepare_event_extraction": "prepare_event_extraction",
+                "extract_sources_from_single_source": "extract_sources_from_single_source",
+            },
         )
 
         # After all source extractions complete, go to prepare_event_extraction
-        self.graph_builder.add_edge("extract_sources_from_single_source", "prepare_event_extraction")
+        # self.graph_builder.add_edge("extract_sources_from_single_source", "prepare_event_extraction")
+        self.graph_builder.add_edge("extract_sources_from_single_source", "start_source_extraction")
 
         # Phase 2: Event extraction with map-reduce
         self.graph_builder.add_conditional_edges(

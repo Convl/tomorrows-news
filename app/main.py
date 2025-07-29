@@ -7,6 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.worker.scheduler import scheduler
+from rich.traceback import install
+
+if settings.DEBUG:
+    install(show_locals=True)
 
 logging.getLogger("asyncio").setLevel(logging.ERROR)
 
@@ -53,6 +57,6 @@ async def root():
 async def dbg():
     print("debug entry hit")
     from app.worker.scraper import Scraper
-    scraper = Scraper(7)
-    # await scraper.scrape()
-    await scraper.test("Entscheidung des OVG Greifswald zum Festival in Jamel und Reaktion des Landkreises")
+    scraper = Scraper(9)
+    await scraper.scrape()
+    # await scraper.test("Entscheidung des OVG Greifswald zum Festival in Jamel und Reaktion des Landkreises")

@@ -1,8 +1,8 @@
 import operator
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, date as dt_date
 from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from app.core.enums import ScrapingSourceEnum
 from app.schemas.topic import TopicBase
@@ -18,7 +18,8 @@ class ScrapingSourceWorkflow(BaseModel):
     language: str | None = None
     last_scraped_at: datetime | None = None
     degrees_of_separation: int = Field(default=0, ge=0)
-    
+    _visited: bool = PrivateAttr(default=False)  # Whether the source has been visited for source extraction
+
     class Config:
         from_attributes = True
 
@@ -29,6 +30,7 @@ class WebSourceBase(BaseModel):
     url: str = Field(description="The full URL of the web source")
     date: datetime = Field(description="The date when the source was published or last updated")
     title: str | None = Field(default=None, description="The headline or title of the source, if available")
+    _visited: bool = PrivateAttr(default=False)  # Whether the source has been visited for source extraction
     degrees_of_separation: int = Field(
         description="The number of degrees of separation from the original source", default=0
     )
@@ -39,6 +41,7 @@ class WebSourceBase(BaseModel):
             url=web_source_with_markdown.url,
             date=web_source_with_markdown.date,
             title=web_source_with_markdown.title,
+            _visited=web_source_with_markdown._visited,
             degrees_of_separation=web_source_with_markdown.degrees_of_separation,
         )
 
@@ -89,9 +92,12 @@ class ExtractedEventBase(BaseModel):
     # date: datetime | DateTimeframe = Field(
     #     description="Event timing: use datetime for exact timing (e.g., '2024-03-15T14:00:00'), or DateTimeframe for approximate timing with earliest/latest bounds. Exact timing is preferred, though only if you are certain that you can determine an exact date. If you are not certain, use DateTimeframe."
     # )
-    date: datetime = Field(
-        description="The date (and, if available, time and timezone) when the event takes place",
-        examples=["2024-03-15T14:00:00+02:00", "2024-03-15T14:00:00", "2024-03-15"],
+    date: datetime | dt_date = Field(
+        description="The date (and, if available, time) when the event takes place. If only a date is mentioned (e.g., 'July 29th'), represent it as a date object (e.g., 2025-07-29). If a date and time are mentioned, represent them as a datetime object (e.g. 2025-07-29T14:30:00).",
+        examples=[
+            "2024-03-15",  # Specific time with timezone
+            "2024-03-15T14:30:00",  # Specific time without timezone
+        ],
     )
     country_code: str | None = Field(
         default=None,
@@ -106,10 +112,10 @@ class ExtractedEventBase(BaseModel):
     significance: float = Field(
         description="A numerical weight (0.0 to 1.0) indicating how important this event is. 0.0 means not important at all, 1.0 means extremely important. This is a subjective measure, and should be based on: 1. The importance of the event to the topic, 2. The nature of the event (is it a mere deadline that is likely to be extended? An intermediate step in a long process? Or the culmination of a long process, where specific results will be presented / decisions will be made?), 3. The likelihood of the event actually happening.",
     )
-    duration: str | None = Field(
+    duration: timedelta | None = Field(
         default=None,
-        description="How long the event lasts",
-        examples=["2 hours", "3 days", "1 week", "30 minutes", "all day"],
+        description="How long the event lasts, in ISO 8601 duration format. Leave blank if no duration is mentioned.",
+        examples=["P3DT12H30M5S", "PT1H30M", "P1D", "PT1H", "PT30M"],
     )
     additional_infos: list[AdditionalInfo] | None = Field(
         default=None,
@@ -125,6 +131,18 @@ class ExtractedEvent(ExtractedEventBase):
 
 class ExtractedBaseEvents(BaseModel):
     events: list[ExtractedEventBase] = Field(description="A list of events extracted from the web source")
+
+
+class EventMergeResponse(BaseModel):
+    is_same_event: bool = Field(description="Whether the two events refer to the same real-world event. True if they do, False if they do not.")
+    merged_title: str | None = Field(
+        description="The merged title of the two events, if they refer to the same real-world event. When merging, try to preserve the most important information from both events. However, if there is contradictory information, you should prioritize the information from the second event.",
+        default=None,
+    )
+    merged_description: str | None = Field(
+        description="The merged description of the two events, if they refer to the same real-world event. When merging, try to preserve the most important information from both events. However, if there is contradictory information, you should prioritize the information from the second event.",
+        default=None,
+    )
 
 
 class ScrapingState(BaseModel):

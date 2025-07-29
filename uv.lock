@@ -2049,6 +2049,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "ipython" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -2079,7 +2080,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ipython", specifier = ">=9.4.0" }]
+dev = [
+    { name = "ipython", specifier = ">=9.4.0" },
+    { name = "rich", specifier = ">=14.0.0" },
+]
 
 [[package]]
 name = "tqdm"
