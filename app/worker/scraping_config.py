@@ -27,13 +27,14 @@ Examples of events that are NOT specific enough:
 SOURCE_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
 You will be given a markdown-converted webpage by the user.
-If the webpage contains links to other webpages that are relevant to the following topic, you need to extract those links. 
-Do not change anything about the links that you extracted, like replacing hyphens or dashes with tildes. 
+If the webpage contains links to other webpages that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
+Notice that the website may contain footers, headers, sidebars or other non-content elements. You should ignore those and only extract links that seem to target substantive content, e.g. news articles, press releases, blog posts, etc.
 Topic name: {topic_name}
 Topic description: {topic_description}
 Topic country: {topic_country}
 """
 )
+
 EVENT_MERGE_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
 You will be given the title and description of two events. 

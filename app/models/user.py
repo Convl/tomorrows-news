@@ -27,4 +27,6 @@ class UserDB(Base):
     )
 
     # Relationships
-    topics: Mapped[List["TopicDB"]] = relationship("TopicDB", back_populates="user", cascade="all, delete-orphan")
+    topics: Mapped[List["TopicDB"]] = relationship(
+        "TopicDB", back_populates="user", cascade="all, delete-orphan", lazy="raise"
+    )

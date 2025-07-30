@@ -7,10 +7,21 @@ import newspaper
 from markdownify import markdownify
 from newspaper import Article, Config
 
+
 from app.core.enums import ScrapingSourceEnum
 
 from .scraping_models import ScrapingSourceWorkflow, WebSourceWithMarkdown
 
+
+from readability import Document
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+import httpx
+from playwright.async_api import async_playwright
+import trafilatura
+from firecrawl import FirecrawlApp, ScrapeOptions
+from app.core.config import settings
 
 def struct_time_to_datetime(struct_time_obj) -> datetime | None:
     """Convert feedparser's struct_time to datetime with UTC timezone."""
@@ -49,29 +60,41 @@ async def web_sources_from_scraping_source(scraping_source: ScrapingSourceWorkfl
 async def extract_sources_from_web(
     url: str, last_scraped_at: datetime, degrees_of_separation: int = 0
 ) -> list[WebSourceWithMarkdown]:
-    """Extract sources from a website using newspaper."""
-    config = Config()
-    config.memorize_articles = False
-    config.disable_category_cache = True
-    website = newspaper.build(url, only_in_path=True, config=config)
-    sources = []
+    """Extract sources from a website."""
+    
+    # config = Config()
+    # config.memorize_articles = False
+    # config.disable_category_cache = True
+    # website = newspaper.build(url, only_in_path=True, config=config)
+    # sources = []
 
-    for article in website.articles:
-        source = await download_and_parse_article(article.url, degrees_of_separation=degrees_of_separation)
-        if source and source.date >= last_scraped_at:
-            sources.append(source)
-        sleep(0.1)
+    # # TODO: filter by last_scraped_at
+    # for article in website.articles:
+    #     source = await download_and_parse_article(article.url, degrees_of_separation=degrees_of_separation)
+    #     if source and source.date >= last_scraped_at:
+    #         sources.append(source)
+    #     sleep(0.1)
 
-    return sources
+    # return sources
 
 
-async def extract_sources_from_rss(url: str, last_scraped_at: datetime, degrees_of_separation: int = 0) -> list[WebSourceWithMarkdown]:
+    lto = "https://www.lto.de/recht/presseschau"
+    bgh = "https://www.bundesgerichtshof.de/DE/Presse/Pressemitteilungen/pressemitteilungen_node.html"
+    einspruch = "https://www.faz.net/einspruch/"
+    welt = "https://www.welt.de/politik/deutschland/"
+    urls = [lto, bgh, einspruch, welt]
+
+
+
+async def extract_sources_from_rss(
+    url: str, last_scraped_at: datetime, degrees_of_separation: int = 0
+) -> list[WebSourceWithMarkdown]:
     """Extract sources from an RSS feed."""
     feed = await asyncio.to_thread(feedparser.parse, url)
     sources = []
 
     # TODO: Remove [:1], filter by last_scraped_at instead
-    for entry in feed.entries[:1]:
+    for entry in feed.entries[:3]:
         if not entry.link:
             continue
 
@@ -95,7 +118,9 @@ async def extract_sources_from_rss(url: str, last_scraped_at: datetime, degrees_
             continue
 
         # Use the RSS feed date instead of letting the function parse the article date
-        source = await download_and_parse_article(entry.link, publish_date=date, degrees_of_separation=degrees_of_separation)
+        source = await download_and_parse_article(
+            entry.link, publish_date=date, degrees_of_separation=degrees_of_separation
+        )
         if source:
             sources.append(source)
         sleep(0.1)

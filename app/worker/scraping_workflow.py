@@ -21,6 +21,7 @@ from app.core.enums import ScrapingSourceEnum
 from app.database import get_db_session
 from app.models import ScrapingSourceDB, TopicDB
 from app.models.event import EventDB
+from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
 from app.schemas.topic import TopicBase
 
@@ -30,11 +31,11 @@ from .scraping_config import (
     SOURCE_EXTRACTION_SYSTEM_TEMPLATE,
 )
 from .scraping_models import (
+    EventMergeResponse,
     ExtractedBaseEvents,
     ExtractedEvent,
     ExtractedEventBase,
     ExtractedUrls,
-    EventMergeResponse,
     ScrapingSourceWorkflow,
     ScrapingState,
     WebSourceBase,
@@ -58,7 +59,7 @@ class Scraper:
         self.sources = []
         self.scraping_source_id = source_id
 
-    async def calculate_evidence_score(evidence_list: list[ExtractedEventDB]) -> float:
+    async def calculate_evidence_score(self, evidence_list: list[ExtractedEventDB]) -> float:
         """Calculate weighted score for a list of evidence based on recency."""
         if not evidence_list:
             return 0.0
@@ -180,12 +181,14 @@ class Scraper:
             event_db, extracted_event_db, db, "duration", "duration_from_id", CONSIDER_NEW_DURATION_TRUE_THRESHOLD
         )
 
-    async def resolve_location_conflict(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
+    async def resolve_location_conflict(
+        self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession
+    ):
         """Resolve location conflicts between an EventDB and an ExtractedEventDB."""
         # If the locations are the same or the new event lacks location info, do nothing
         if event_db.location == extracted_event_db.location or extracted_event_db.location is None:
             return
-        
+
         # Update the event if it currently has no location, or the new location merely adds information
         if event_db.location is None or event_db.location in extracted_event_db.location:
             event_db.location = extracted_event_db.location
@@ -193,14 +196,18 @@ class Scraper:
             db.add(event_db)
             await db.flush()
             return
-        
+
         # Use generic evidence-based conflict resolution
         await self.resolve_evidence_based_conflict(
             event_db, extracted_event_db, db, "location", "location_from_id", CONSIDER_NEW_LOCATION_TRUE_THRESHOLD
         )
-        
-    async def merge_events(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
-        """Merge an ExtractedEventDB into an EventDB."""
+
+    async def merge_with_llm_if_same_event(
+        self, extracted_event_db: ExtractedEventDB, event_db: EventDB, db: AsyncSession
+    ) -> EventMergeResponse:
+        """
+        Check if two events represent the same real-world event and merge their titles and descriptions if they do.
+        """
         merge_message = await EVENT_MERGE_SYSTEM_TEMPLATE.aformat(
             title_1=event_db.title,
             description_1=event_db.description,
@@ -208,22 +215,67 @@ class Scraper:
             description_2=extracted_event_db.description,
         )
         response = await self.event_merging_llm.ainvoke([merge_message])
+        parsed_response: EventMergeResponse = response["parsed"]
 
-    async def update_event_db(self, event_db: EventDB, extracted_event_db: ExtractedEventDB, db: AsyncSession):
-        """Update an EventDB with an ExtractedEventDB."""
+        return parsed_response
+
+    async def store_event_comparison(
+        self,
+        extracted_event_db: ExtractedEventDB,
+        event_db: EventDB,
+        vector_similarity: float,
+        vector_threshold_met: bool,
+        llm_considers_same_event: bool,
+        db: AsyncSession,
+    ):
+        """Stores data from an ExtractedEventDB and EventDB comparison for analysis purposes."""
+        comparison = EventComparisonDB(
+            extracted_event_id=extracted_event_db.id,
+            event_id=event_db.id,
+            extracted_event_title=extracted_event_db.title,
+            extracted_event_description=extracted_event_db.description,
+            event_title=event_db.title,
+            event_description=event_db.description,
+            vector_similarity=vector_similarity,
+            vector_threshold_met=vector_threshold_met,
+            llm_considers_same_event=llm_considers_same_event,
+        )
+        db.add(comparison)
+        await db.flush()
+
+    async def update_event_db(
+        self,
+        event_db: EventDB,
+        extracted_event_db: ExtractedEventDB,
+        merge_response: EventMergeResponse,
+        db: AsyncSession,
+    ):
+        """Update the date, duration, location, and additional infos of an EventDB with an ExtractedEventDB."""
+        # Set title and description; these were determined by merge_with_llm_if_same_event
+        event_db.title = merge_response.merged_title
+        event_db.description = merge_response.merged_description
+
+        # Resolve conflicts / merge data for date, duration and location
         await self.resolve_date_conflict(event_db, extracted_event_db, db)
         await self.resolve_duration_conflict(event_db, extracted_event_db, db)
         await self.resolve_location_conflict(event_db, extracted_event_db, db)
-        for info in extracted_event_db.additional_infos:
-            if info in event_db.additional_infos:
-                event_db.additional_infos[info] += f"\n{extracted_event_db.additional_infos[info]}"
-            else:
-                event_db.additional_infos[info] = extracted_event_db.additional_infos[info]
+
+        # Merge additional infos
+        if extracted_event_db.additional_infos:
+            if not event_db.additional_infos:
+                event_db.additional_infos = {}
+
+            for k, v in extracted_event_db.additional_infos.items():
+                if k in event_db.additional_infos:
+                    event_db.additional_infos[k] += f"\n{v}"
+                else:
+                    event_db.additional_infos[k] = v
+
         db.add(event_db)
         await db.flush()
 
-
     async def commit_extracted_events_to_db(self, state: ScrapingState):
+        """Commit ExtractedEvents to the database, then call consolidate_extracted_events."""
         extracted_events_db = []
         async with get_db_session() as db:
             for extracted_event in state.events:
@@ -240,81 +292,56 @@ class Scraper:
                 extracted_events_db.append(extracted_event_db)
                 await db.flush()
             await db.commit()
+            await self.consolidate_extracted_events(extracted_events_db, db)
 
-            for extracted_event_db in extracted_events_db:
-                most_similar_extracted_events = (
-                    await db.execute(
-                        select(
-                            ExtractedEventDB,
-                            (
-                                1 - ExtractedEventDB.semantic_vector.cosine_distance(extracted_event_db.semantic_vector)
-                            ).label("similarity"),
-                        )
-                        .where(ExtractedEventDB.semantic_vector.isnot(None))
-                        .order_by(text("similarity DESC"))
+    async def consolidate_extracted_events(self, extracted_events_db: list[ExtractedEventDB], db: AsyncSession):
+        """After ExtractedEvents have been added to the database, either merge them into existing EventDBs or create new EventDBs from them."""
+        for extracted_event_db in extracted_events_db:
+            event_with_similarity = (
+                await db.execute(
+                    select(
+                        EventDB,
+                        (1 - EventDB.semantic_vector.cosine_distance(extracted_event_db.semantic_vector)).label(
+                            "similarity"
+                        ),
                     )
-                ).all()
-                print(f"### Most similar extracted events: for {extracted_event_db.title}")
-                for i, (event, similarity) in enumerate(most_similar_extracted_events):
-                    print(f"Similar extracted event {i}: Cosine distance: {similarity}")
-                    print(f"Similar extracted event {i}: {event.title}")
-                    print(f"Similar extracted event {i}: {event.description}")
-                    print(f"Similar extracted event {i}: {event.location}")
-                    print(f"Similar extracted event {i}: {event.date}")
+                    .where(EventDB.semantic_vector.isnot(None))
+                    .order_by(text("similarity DESC"))
+                    .limit(1)
+                )
+            ).first()
+            event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
 
-                event_with_similarity = (
-                    await db.execute(
-                        select(
-                            EventDB,
-                            (1 - EventDB.semantic_vector.cosine_distance(extracted_event_db.semantic_vector)).label(
-                                "similarity"
-                            ),
-                        )
-                        .where(EventDB.semantic_vector.isnot(None))
-                        .order_by(text("similarity DESC"))
-                        .limit(1)
-                    )
-                ).first()
-                event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
+            # TODO: change to if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD, remove the latter condition in the next if clause, once confident about the threshold value
+            if event_db:
+                merge_response = await self.merge_with_llm_if_same_event(extracted_event_db, event_db, db)
+                await self.store_event_comparison(
+                    extracted_event_db,
+                    event_db,
+                    similarity,
+                    similarity > CONSIDER_SAME_EVENT_THRESHOLD,
+                    merge_response.is_same_event,
+                    db,
+                )
 
-                if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
-                    print("### Similar event found, checking if LLM agrees")
-                    print(f"Extracted event title: {extracted_event_db.title}")
-                    print(f"Extracted event description: {extracted_event_db.description}")
-                    print(f"Similar event title: {event_db.title}")
-                    print(f"Similar event description: {event_db.description}")
-                    print(f"Cosine distance: {similarity}")
-                    
-                    merge_message = await EVENT_MERGE_SYSTEM_TEMPLATE.aformat(
-                        title_1=event_db.title,
-                        description_1=event_db.description,
-                        title_2=extracted_event_db.title,
-                        description_2=extracted_event_db.description,
-                    )
-                    response = await self.event_merging_llm.ainvoke([merge_message])
-                    parsed_response : EventMergeResponse = response["parsed"]
-                    if parsed_response.is_same_event:
-                        print("### LLM agrees, merging events")
-                        event_db.title = parsed_response.merged_title
-                        event_db.description = parsed_response.merged_description
-                        extracted_event_db.event_id = event_db.id
-                        db.add(event_db)
-                        db.add(extracted_event_db)
-                        await db.flush()
-                        await self.update_event_db(event_db, extracted_event_db, db)
-                        continue
-                    else:
-                        print("### LLM disagrees, new event will be created")
-                
-                # if we get here, no similar event was found, or the llm disagreed that it was similar
-                print("### No similar event found, creating new event")
-                new_event = EventDB.from_extracted_event_db(extracted_event_db)
-                db.add(new_event)
-                await db.flush()
-                extracted_event_db.event_id = new_event.id
-                db.add(extracted_event_db)
-                await db.flush()
-            await db.commit()
+                # if extracted_event_db and event_db both refer to the same real-world event according to their vector scores and merge_with_llm_if_same_event, merge them
+                if merge_response.is_same_event and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
+                    extracted_event_db.event_id = event_db.id
+
+                    db.add(extracted_event_db)
+                    await db.flush()
+                    await self.update_event_db(event_db, extracted_event_db, merge_response, db)
+                    continue
+
+            # if we get here, no similar event was found, so we create a new one
+            print("### No similar event found, creating new event")
+            new_event = EventDB.from_extracted_event_db(extracted_event_db)
+            db.add(new_event)
+            await db.flush()
+            extracted_event_db.event_id = new_event.id
+            db.add(extracted_event_db)
+            await db.flush()
+        await db.commit()
 
     async def extract_sources_from_single_source(
         self, state: dict[str, WebSourceWithMarkdown]
@@ -517,8 +544,10 @@ class Scraper:
         self.llm = ChatOpenAI(
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
-            model_name="google/gemini-2.5-pro",
+            model_name="moonshotai/kimi-k2",
+            # model_name="google/gemini-2.5-pro",
             # model_name="openai/gpt-4.1-mini",
+            temperature=0.2,
             rate_limiter=self.rate_limiter,
         )
         self.event_extracting_llm = self.llm.with_structured_output(
@@ -597,28 +626,6 @@ class Scraper:
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
 
     async def test(self, semantic_content: str):
-        # await self._prepare_scraper()
-        # print(f"Running test for {semantic_content}")
-
-        # semantic_vector = await self.embeddings.aembed_query(semantic_content)
-
-        # async with get_db_session() as db:
-        #     query = (
-        #         select(
-        #             ExtractedEventDB,
-        #             (1 - ExtractedEventDB.semantic_vector.cosine_distance(semantic_vector)).label("similarity"),
-        #         )
-        #         .where(ExtractedEventDB.semantic_vector.isnot(None))
-        #         .order_by(text("similarity DESC"))
-        #     )
-        #     result = (await db.execute(query)).all()
-
-        #     for i, (event, similarity) in enumerate(result):
-        #         print(f"Similar event {i}: Cosine distance: {similarity}")
-        #         print(f"Similar event {i}: Title: {event.title}")
-        #         print(f"Similar event {i}: Description: {event.description}")
-        #         print(f"Similar event {i}: Location: {event.location}")
-        #         print(f"Similar event {i}: Date: {event.date}")
         print(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))
 
     @classmethod

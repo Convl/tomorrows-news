@@ -62,6 +62,8 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: SecretStr
 
+    FIRECRAWL_API_KEY: SecretStr
+
     LANGSMITH_API_KEY: SecretStr
     LANGSMITH_TRACING: bool = True
     LANGSMITH_PROJECT: str = "tomorrows-news"

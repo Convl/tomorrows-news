@@ -10,6 +10,8 @@ TODO:
 2. When extracting sources, newspaper4k sometimes fails to find article.publish_date, even though it is there. This happens e.g. for beck-aktuell articles. Those articles currently get discarded, because we can't verify that they were published since the last scraping run. In the future, try to add additional logic, e.g. by trying to discover the article in a rss feed, custom html/url/header parsing, etc, to ascertain publication date when newspaper4k can't.
 3. Is extracting links via LLM really any better than extracting them via beautifulsoup? Test performance of different models in extracting (only/all) relevant links
 4. Further investigate this error: https://github.com/langchain-ai/langgraph/issues/5675
+5. Playwright dependency is really heavy. Replace with Scrapy or Firecrawl MCP?
+6. Remove unused imports from pyproject.toml
 
 Feature Ideas:
 1. Extend possible dates for Events to date ranges (see commented out code using datetime | DateTimeFrame)

@@ -32,11 +32,13 @@ class TopicDB(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Relationships
-    user: Mapped["UserDB"] = relationship("UserDB", back_populates="topics")
-    events: Mapped[List["EventDB"]] = relationship("EventDB", back_populates="topic", cascade="all, delete-orphan")
+    user: Mapped["UserDB"] = relationship("UserDB", back_populates="topics", lazy="raise")
+    events: Mapped[List["EventDB"]] = relationship(
+        "EventDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+    )
     extracted_events: Mapped[List["ExtractedEventDB"]] = relationship(
-        "ExtractedEventDB", back_populates="topic", cascade="all, delete-orphan"
+        "ExtractedEventDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
     )
     scraping_sources: Mapped[List["ScrapingSourceDB"]] = relationship(
-        "ScrapingSourceDB", back_populates="topic", cascade="all, delete-orphan"
+        "ScrapingSourceDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
     )

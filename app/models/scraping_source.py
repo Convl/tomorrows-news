@@ -48,11 +48,11 @@ class ScrapingSourceDB(Base):
 
     # Topic relationship
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
-    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="scraping_sources")
+    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="scraping_sources", lazy="raise")
 
     # ExtractedEvents extracted via this ScrapingSource
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
-        "ExtractedEventDB", back_populates="scraping_source", cascade="all, delete-orphan"
+        "ExtractedEventDB", back_populates="scraping_source", cascade="all, delete-orphan", lazy="raise"
     )
 
     # Timestamps

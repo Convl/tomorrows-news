@@ -1,18 +1,19 @@
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from rich.traceback import install
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.worker.scheduler import scheduler
-from rich.traceback import install
 
 if settings.DEBUG:
     install(show_locals=True)
 
 logging.getLogger("asyncio").setLevel(logging.ERROR)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,7 +57,19 @@ async def root():
 @app.get("/debug")
 async def dbg():
     print("debug entry hit")
+    from sqlalchemy import delete
+
+    from app.database import get_db_session
+    from app.models import EventComparisonDB, EventDB, ExtractedEventDB
     from app.worker.scraper import Scraper
-    scraper = Scraper(9)
+
+    # Clear test data before running scraper
+    # async with get_db_session() as db:
+    #     await db.execute(delete(EventComparisonDB))
+    #     await db.execute(delete(ExtractedEventDB))
+    #     await db.execute(delete(EventDB))
+    #     await db.commit()
+    #     print("Cleared all EventDB, ExtractedEventDB, and EventComparisonDB records")
+
+    scraper = Scraper(12)
     await scraper.scrape()
-    # await scraper.test("Entscheidung des OVG Greifswald zum Festival in Jamel und Reaktion des Landkreises")

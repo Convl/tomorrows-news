@@ -51,23 +51,13 @@ class WebSourceWithMarkdown(WebSourceBase):
 
     markdown: str = Field(description="The full source's content, converted to markdown format for processing")
 
+class WebSourceExtracted(BaseModel):
+    url: str = Field(description="The full URL of the web source")
+    title: str | None = Field(default=None, description="The headline or title of the source, if available")
+    publish_date: datetime | None = Field(default=None, description="The date when the source was published or last updated")
 
 class ExtractedUrls(BaseModel):
     urls: list[str] = Field(description="A list of URLs extracted from the web source")
-
-
-class AdditionalInfo(BaseModel):
-    """Supplementary information about an event with an importance weight. This can be used to provide additional context or details about the event."""
-
-    info_name: str = Field(
-        description="The name of the additional piece of information (e.g. 'registration_link', 'reference_number', 'accreditation_deadline', etc.)"
-    )
-    info_value: str = Field(
-        description="The value of the additional piece of information (e.g. 'https://www.example.com/registration', '1234567890', '2025-08-01', etc.)"
-    )
-    weight: float = Field(
-        description="A numerical weight (0.0 to 1.0) indicating how helpful this piece of additional information will be in disambiguating the event that it belongs to from other, similar events pertaining to the same topic. 0.0 means not helpful at all, 1.0 means extremely helpful."
-    )
 
 
 class DateTimeframe(BaseModel):
@@ -117,9 +107,14 @@ class ExtractedEventBase(BaseModel):
         description="How long the event lasts, in ISO 8601 duration format. Leave blank if no duration is mentioned.",
         examples=["P3DT12H30M5S", "PT1H30M", "P1D", "PT1H", "PT30M"],
     )
-    additional_infos: list[AdditionalInfo] | None = Field(
+    additional_infos: dict[str, str] | None = Field(
         default=None,
-        description="Optional supplementary information about the event with associated importance weights. Only include if: 1. The additional information is helpful in disambiguating the event from other, similar events pertaining to the same topic AND 2. The additional information is not already covered by any of the other fields., 3. The additional info is not about the source where the event was found.",
+        description="Optional supplementary information about the event, to be stored as key-value pairs. DO NOT include information here that fits more accurately into any of the other fields, or that relates to the source where the event was found.",
+        examples=[
+            {"registration_link": "https://www.example.com/registration"},
+            {"reference_number": "1234567890"},
+            {"accreditation_deadline": "2025-08-01"},
+        ],
     )
 
 
@@ -143,7 +138,6 @@ class EventMergeResponse(BaseModel):
         description="The merged description of the two events, if they refer to the same real-world event. When merging, try to preserve the most important information from both events. However, if there is contradictory information, you should prioritize the information from the second event.",
         default=None,
     )
-
 
 class ScrapingState(BaseModel):
     scraping_source: ScrapingSourceWorkflow = Field(description="The scraping source that is being processed")

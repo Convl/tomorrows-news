@@ -1,14 +1,13 @@
-from datetime import datetime, timezone, date
+from datetime import date, datetime, time, timezone, timedelta
 from typing import TYPE_CHECKING, Any, Dict
 
 import pytz
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, Interval
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
-from app.worker.scraping_models import AdditionalInfo
 
 if TYPE_CHECKING:
     from app.models.event import EventDB
@@ -30,18 +29,8 @@ class ExtractedEventDB(Base):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
     significance: Mapped[float] = mapped_column(Float, nullable=False)
-    duration: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    additional_infos: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
-
-    @property
-    def additional_infos_list(self) -> list[AdditionalInfo] | None:
-        """Convert JSON back to list[AdditionalInfo]."""
-        return [AdditionalInfo(**item) for item in self.additional_infos] if self.additional_infos else None
-
-    @additional_infos_list.setter
-    def additional_infos_list(self, value: list[AdditionalInfo] | None):
-        """Convert list[AdditionalInfo] to JSON for storage."""
-        self.additional_infos = [item.model_dump() for item in value] if value else None
+    duration: Mapped[timedelta | None] = mapped_column(Interval, nullable=True)
+    additional_infos: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
 
     # Fields that mirror the WebSource from which the ExtractedEvent was extracted
     source_url: Mapped[str] = mapped_column(String(1000), nullable=False)
@@ -57,15 +46,19 @@ class ExtractedEventDB(Base):
 
     # Scraping Source which led to this extraction:
     scraping_source_id: Mapped[int] = mapped_column(Integer, ForeignKey("scraping_sources.id"), nullable=False)
-    scraping_source: Mapped["ScrapingSourceDB"] = relationship("ScrapingSourceDB", back_populates="extracted_events")
+    scraping_source: Mapped["ScrapingSourceDB"] = relationship(
+        "ScrapingSourceDB", back_populates="extracted_events", lazy="raise"
+    )
 
     # Topic which this extracted event belongs to
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
-    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="extracted_events")
+    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="extracted_events", lazy="raise")
 
     # The consolidated event, create from this ExtractedEvent and others
     event_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("events.id"), nullable=True)
-    event: Mapped["EventDB"] = relationship("EventDB", back_populates="extracted_events", foreign_keys=[event_id])
+    event: Mapped["EventDB"] = relationship(
+        "EventDB", back_populates="extracted_events", foreign_keys=[event_id], lazy="raise"
+    )
 
     @classmethod
     def from_extracted_event(
@@ -80,7 +73,7 @@ class ExtractedEventDB(Base):
         # If event only has a date and no time, set it to midnight
         event_date = event_data.pop("date")
         if isinstance(event_date, date) and not isinstance(event_date, datetime):
-            event_date = datetime.combine(event_date, datetime.time(0, 0, 0))
+            event_date = datetime.combine(event_date, time(0, 0, 0))
 
         # Localize event date to the timezone of the country where the event takes place, or UTC as a fallback
         event_country_code = event_data.pop("country_code")
@@ -99,7 +92,7 @@ class ExtractedEventDB(Base):
                     pass
             else:
                 pass
-        
+
         if event_date.tzinfo:
             event_date = event_date.replace(tzinfo=None)
         event_date = event_country_timezone.localize(event_date)

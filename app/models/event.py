@@ -1,13 +1,12 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, Interval
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
-from app.worker.scraping_models import AdditionalInfo
 
 if TYPE_CHECKING:
     from app.models.extracted_event import ExtractedEventDB
@@ -27,18 +26,8 @@ class EventDB(Base):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
     significance: Mapped[float] = mapped_column(Float, nullable=False)
-    duration: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    additional_infos: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
-
-    @property
-    def additional_infos_list(self) -> list[AdditionalInfo] | None:
-        """Convert JSON back to list[AdditionalInfo]."""
-        return [AdditionalInfo(**item) for item in self.additional_infos] if self.additional_infos else None
-
-    @additional_infos_list.setter
-    def additional_infos_list(self, value: list[AdditionalInfo] | None):
-        """Convert list[AdditionalInfo] to JSON for storage."""
-        self.additional_infos = [item.model_dump() for item in value] if value else None
+    duration: Mapped[timedelta | None] = mapped_column(Interval, nullable=True)
+    additional_infos: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
 
     # Provenance fields. Title and description may be composites. Location and duration are optional.
     title_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
@@ -59,7 +48,7 @@ class EventDB(Base):
 
     # Topic (parent)
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
-    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="events")
+    topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="events", lazy="raise")
 
     # Extracted Events (children)
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
@@ -67,6 +56,7 @@ class EventDB(Base):
         back_populates="event",
         cascade="all, delete-orphan",
         foreign_keys="ExtractedEventDB.event_id",
+        lazy="raise",
     )
 
     @classmethod
