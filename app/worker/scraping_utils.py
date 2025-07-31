@@ -3,25 +3,25 @@ from datetime import datetime, timezone
 from time import sleep
 
 import feedparser
-import newspaper
 from markdownify import markdownify
-from newspaper import Article, Config
-
+from newspaper import Article
 
 from app.core.enums import ScrapingSourceEnum
 
+from .llm_service import LlmService
 from .scraping_models import ScrapingSourceWorkflow, WebSourceWithMarkdown
 
+# Module-level LLM service instance that can be used by functions
+_llm_service = None
 
-from readability import Document
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-import httpx
-from playwright.async_api import async_playwright
-import trafilatura
-from firecrawl import FirecrawlApp, ScrapeOptions
-from app.core.config import settings
+
+async def get_llm_service() -> LlmService:
+    """Get or create the module-level LLM service instance."""
+    global _llm_service
+    if _llm_service is None:
+        _llm_service = LlmService()
+    return _llm_service
+
 
 def struct_time_to_datetime(struct_time_obj) -> datetime | None:
     """Convert feedparser's struct_time to datetime with UTC timezone."""
@@ -61,7 +61,7 @@ async def extract_sources_from_web(
     url: str, last_scraped_at: datetime, degrees_of_separation: int = 0
 ) -> list[WebSourceWithMarkdown]:
     """Extract sources from a website."""
-    
+
     # config = Config()
     # config.memorize_articles = False
     # config.disable_category_cache = True
@@ -77,13 +77,14 @@ async def extract_sources_from_web(
 
     # return sources
 
+    # Some example URLs for testing:
+    # lto = "https://www.lto.de/recht/presseschau"
+    # bgh = "https://www.bundesgerichtshof.de/DE/Presse/Pressemitteilungen/pressemitteilungen_node.html"
+    # einspruch = "https://www.faz.net/einspruch/"
+    # welt = "https://www.welt.de/politik/deutschland/"
 
-    lto = "https://www.lto.de/recht/presseschau"
-    bgh = "https://www.bundesgerichtshof.de/DE/Presse/Pressemitteilungen/pressemitteilungen_node.html"
-    einspruch = "https://www.faz.net/einspruch/"
-    welt = "https://www.welt.de/politik/deutschland/"
-    urls = [lto, bgh, einspruch, welt]
-
+    
+    raise NotImplementedError("Not implemented")
 
 
 async def extract_sources_from_rss(

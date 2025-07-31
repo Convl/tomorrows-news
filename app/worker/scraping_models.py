@@ -59,12 +59,6 @@ class WebSourceExtracted(BaseModel):
 class ExtractedUrls(BaseModel):
     urls: list[str] = Field(description="A list of URLs extracted from the web source")
 
-
-class DateTimeframe(BaseModel):
-    earliest: datetime = Field(description="Earliest possible date/time for the event")
-    latest: datetime = Field(description="Latest possible date/time for the event")
-
-
 class ExtractedEventBase(BaseModel):
     """An event extracted from a web source that is relevant to a specific topic of interest."""
 

@@ -3,8 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pprint import pprint
 
 from langchain_core.messages import HumanMessage
-from langchain_core.rate_limiters import InMemoryRateLimiter
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
@@ -25,17 +24,12 @@ from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
 from app.schemas.topic import TopicBase
 
-from .scraping_config import (
-    EVENT_EXTRACTION_SYSTEM_TEMPLATE,
-    EVENT_MERGE_SYSTEM_TEMPLATE,
-    SOURCE_EXTRACTION_SYSTEM_TEMPLATE,
-)
+from .llm_service import LlmService
+from .scraping_config import EVENT_MERGE_SYSTEM_TEMPLATE
 from .scraping_models import (
     EventMergeResponse,
-    ExtractedBaseEvents,
     ExtractedEvent,
     ExtractedEventBase,
-    ExtractedUrls,
     ScrapingSourceWorkflow,
     ScrapingState,
     WebSourceBase,
@@ -43,8 +37,6 @@ from .scraping_models import (
 )
 from .scraping_utils import (
     download_and_parse_article,
-    extract_sources_from_rss,
-    extract_sources_from_web,
     web_sources_from_scraping_source,
 )
 
@@ -214,7 +206,7 @@ class Scraper:
             title_2=extracted_event_db.title,
             description_2=extracted_event_db.description,
         )
-        response = await self.event_merging_llm.ainvoke([merge_message])
+        response = await self.llm_service.event_merging_llm.ainvoke([merge_message])
         parsed_response: EventMergeResponse = response["parsed"]
 
         return parsed_response
@@ -357,7 +349,7 @@ class Scraper:
                 self.source_extraction_system_message,
                 HumanMessage(f"Extract sources from the following webpage: {source.markdown}"),
             ]
-            response = await self.source_extracting_llm.ainvoke(messages)
+            response = await self.llm_service.source_extracting_llm.ainvoke(messages)
             urls = response["parsed"].urls
             print(f"Found {len(urls)} URLs to extract from {source.url}")
 
@@ -409,7 +401,7 @@ class Scraper:
             HumanMessage(f"Extract events from the following webpage: {source.markdown}"),
         ]
         try:
-            response = await self.event_extracting_llm.ainvoke(messages)
+            response = await self.llm_service.event_extracting_llm.ainvoke(messages)
             events: list[ExtractedEventBase] = response["parsed"].events
             print(f"Extracted {len(events)} events from {source.url}")
         except Exception as e:
@@ -506,68 +498,17 @@ class Scraper:
                 raise ValueError(f"Topic with id {self.scraping_source.topic_id} not found.")
             self.topic = TopicBase.model_validate(topic, from_attributes=True)
 
-            # Create system messages using the templates
-            self.event_extraction_system_message = await EVENT_EXTRACTION_SYSTEM_TEMPLATE.aformat(
-                topic_name=self.topic.name,
-                topic_description=self.topic.description,
-                topic_country=self.topic.country,
-                current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                language=self.scraping_source.language,
+            # Initialize LLM service
+            self.llm_service = LlmService()
+
+            # Create system messages using the LLM service
+            self.event_extraction_system_message = await self.llm_service.get_event_extraction_system_message(
+                self.topic, self.scraping_source.language
+            )
+            self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
+                self.topic
             )
 
-            self.source_extraction_system_message = await SOURCE_EXTRACTION_SYSTEM_TEMPLATE.aformat(
-                topic_name=self.topic.name,
-                topic_description=self.topic.description,
-                topic_country=self.topic.country,
-            )
-
-        # # Load initial sources based on source type
-        # match self.scraping_source.source_type:
-        #     case ScrapingSourceEnum.WEBPAGE:
-        #         self.sources += await extract_sources_from_web(
-        #             self.scraping_source.base_url, self.scraping_source.last_scraped_at
-        #         )
-        #     case ScrapingSourceEnum.RSS:
-        #         self.sources += await extract_sources_from_rss(
-        #             self.scraping_source.base_url, self.scraping_source.last_scraped_at
-        #         )
-        #     case _:
-        #         raise ValueError(f"Unsupported source type: {self.scraping_source.source_type}")
-
-        # Setup LLM and rate limiter
-        self.rate_limiter = InMemoryRateLimiter(
-            requests_per_second=1,
-            check_every_n_seconds=0.9,
-            max_bucket_size=1,
-        )
-
-        self.llm = ChatOpenAI(
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base=settings.OPENROUTER_BASE_URL,
-            model_name="moonshotai/kimi-k2",
-            # model_name="google/gemini-2.5-pro",
-            # model_name="openai/gpt-4.1-mini",
-            temperature=0.2,
-            rate_limiter=self.rate_limiter,
-        )
-        self.event_extracting_llm = self.llm.with_structured_output(
-            schema=ExtractedBaseEvents,
-            method="json_schema",
-            include_raw=True,
-            strict=True,
-        )
-        self.source_extracting_llm = self.llm.with_structured_output(
-            schema=ExtractedUrls,
-            method="json_schema",
-            include_raw=True,
-            strict=True,
-        )
-        self.event_merging_llm = self.llm.with_structured_output(
-            schema=EventMergeResponse,
-            method="json_schema",
-            include_raw=True,
-            strict=True,
-        )
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
