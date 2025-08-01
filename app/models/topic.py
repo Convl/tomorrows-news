@@ -1,6 +1,8 @@
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List
 
+from fastapi_users_db_sqlalchemy import GUID
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -29,7 +31,7 @@ class TopicDB(Base):
     )
 
     # Foreign key to user
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id"), nullable=False)
 
     # Relationships
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="topics", lazy="raise")

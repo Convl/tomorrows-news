@@ -1,14 +1,10 @@
-"""User management endpoints using FastAPI-Users."""
+"""Authentication endpoints using FastAPI-Users."""
 
 from app.core.auth import auth_backend, fastapi_users
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead
 
-# Get the FastAPI-Users routers
+# Authentication routes
 auth_router = fastapi_users.get_auth_router(auth_backend)
 register_router = fastapi_users.get_register_router(UserRead, UserCreate)
 reset_password_router = fastapi_users.get_reset_password_router()
 verify_router = fastapi_users.get_verify_router(UserRead)
-users_router = fastapi_users.get_users_router(UserRead, UserUpdate)
-
-# For backward compatibility, export the users router as router
-router = users_router

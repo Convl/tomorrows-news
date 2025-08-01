@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from typing import List
 
@@ -14,7 +15,8 @@ class TopicBase(BaseModel):
 
 
 class TopicCreate(TopicBase):
-    user_id: int
+    # user_id will be set automatically from current_user
+    pass
 
 
 class TopicUpdate(BaseModel):
@@ -28,7 +30,7 @@ class TopicUpdate(BaseModel):
 
 class TopicResponse(TopicBase):
     id: int
-    user_id: int
+    user_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
 

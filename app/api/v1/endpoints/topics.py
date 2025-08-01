@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import current_active_user, current_superuser
 from app.database import get_db
 from app.models.topic import TopicDB
 from app.models.user import UserDB
@@ -13,12 +14,15 @@ router = APIRouter()
 
 
 @router.post("/", response_model=TopicResponse, status_code=status.HTTP_201_CREATED)
-async def create_topic(topic: TopicCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new topic"""
-    if (await db.execute(select(UserDB).where(UserDB.id == topic.user_id))).scalars().one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No user with this ID exists.")
+async def create_topic(
+    topic: TopicCreate, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
+):
+    """Create a new topic for the current user"""
+    # Create topic with current user's ID
+    topic_data = topic.model_dump()
+    topic_data["user_id"] = current_user.id
 
-    db_topic = TopicDB(**topic.model_dump())
+    db_topic = TopicDB(**topic_data)
     db.add(db_topic)
     await db.commit()
     await db.refresh(db_topic)
@@ -26,29 +30,84 @@ async def create_topic(topic: TopicCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{topic_id}", response_model=TopicResponse)
-async def get_topic(topic_id: int, db: AsyncSession = Depends(get_db)):
-    """Get a topic by ID"""
-    # TODO: Implement topic retrieval logic
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Topic retrieval not implemented yet")
+async def get_topic(
+    topic_id: int, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
+):
+    """Get a topic by ID (only user's own topics or admin can access any)"""
+    query = select(TopicDB).where(TopicDB.id == topic_id)
+
+    # If not superuser, restrict to user's own topics
+    if not current_user.is_superuser:
+        query = query.where(TopicDB.user_id == current_user.id)
+
+    topic = (await db.execute(query)).scalars().first()
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+
+    return topic
 
 
 @router.get("/", response_model=List[TopicResponse])
-async def list_topics(*, skip: int = 0, limit: int = 100, user_id: int, db: AsyncSession = Depends(get_db)):
-    """List topics with pagination and optional user filtering"""
-    return (
-        (await db.execute(select(TopicDB).where(TopicDB.user_id == user_id).offset(skip).limit(limit))).scalars().all()
-    )
+async def list_topics(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: UserDB = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List topics for the current user (admins can see all)"""
+    query = select(TopicDB)
+
+    # If not superuser, restrict to user's own topics
+    if not current_user.is_superuser:
+        query = query.where(TopicDB.user_id == current_user.id)
+
+    topics = (await db.execute(query.offset(skip).limit(limit))).scalars().all()
+    return topics
 
 
 @router.put("/{topic_id}", response_model=TopicResponse)
-async def update_topic(topic_id: int, topic_update: TopicUpdate, db: AsyncSession = Depends(get_db)):
-    """Update a topic"""
-    # TODO: Implement topic update logic
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Topic update not implemented yet")
+async def update_topic(
+    topic_id: int,
+    topic_update: TopicUpdate,
+    current_user: UserDB = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a topic (only owner or admin)"""
+    query = select(TopicDB).where(TopicDB.id == topic_id)
+
+    # If not superuser, restrict to user's own topics
+    if not current_user.is_superuser:
+        query = query.where(TopicDB.user_id == current_user.id)
+
+    topic = (await db.execute(query)).scalars().first()
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+
+    # Update topic with provided fields
+    update_data = topic_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(topic, field, value)
+
+    await db.commit()
+    await db.refresh(topic)
+    return topic
 
 
 @router.delete("/{topic_id}")
-async def delete_topic(topic_id: int, db: AsyncSession = Depends(get_db)):
-    """Delete a topic"""
-    # TODO: Implement topic deletion logic
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Topic deletion not implemented yet")
+async def delete_topic(
+    topic_id: int, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
+):
+    """Delete a topic (only owner or admin)"""
+    query = select(TopicDB).where(TopicDB.id == topic_id)
+
+    # If not superuser, restrict to user's own topics
+    if not current_user.is_superuser:
+        query = query.where(TopicDB.user_id == current_user.id)
+
+    topic = (await db.execute(query)).scalars().first()
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+
+    await db.delete(topic)
+    await db.commit()
+    return {"message": "Topic deleted successfully"}

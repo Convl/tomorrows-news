@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PYTHONASYNCIODEBUG: bool = False
 
+    PROJECT_EMAIL: str
+    PROJECT_EMAIL_PASSWORD: SecretStr
+    PROJECT_EMAIL_FROM_NAME: str
+    PROJECT_EMAIL_PORT: int
+    PROJECT_EMAIL_HOST: str
+
+    JWT_SECRET: SecretStr
+
     # API settings
     API_V1_STR: str = "/api/v1"
 
@@ -69,6 +77,9 @@ class Settings(BaseSettings):
     LANGSMITH_PROJECT: str = "tomorrows-news"
 
     TAVILY_API_KEY: SecretStr
+
+    # Frontend URL for email links
+    FRONTEND_URL: str = "http://localhost:8000"
 
     class Config:
         env_file = ".env"

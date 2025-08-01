@@ -2,14 +2,14 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL, 
-    future=True, 
+    settings.DATABASE_URL,
+    future=True,
     connect_args=settings.CONNECT_ARGS,
     # Recycle the connection to avoid connection issues.
     # See:
@@ -27,8 +27,10 @@ engine = create_async_engine(
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+
 # Base class for models
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 # Private session factory base function
