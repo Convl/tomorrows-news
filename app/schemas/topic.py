@@ -10,7 +10,6 @@ class TopicBase(BaseModel):
     description: str | None = None
     keywords: str | None = None
     country: str | None = Field(None, max_length=200)
-    language: str | None = Field(None, max_length=10)
     is_active: bool = True
 
 
@@ -24,7 +23,6 @@ class TopicUpdate(BaseModel):
     description: str | None = None
     keywords: str | None = None
     country: str | None = Field(None, max_length=200)
-    language: str | None = Field(None, max_length=10)
     is_active: bool | None = None
 
 
@@ -36,6 +34,11 @@ class TopicResponse(TopicBase):
 
     class Config:
         from_attributes = True
+
+
+class TopicWithCounts(TopicResponse):
+    source_count: int = 0
+    event_count: int = 0
 
 
 class TopicWithEvents(TopicResponse):

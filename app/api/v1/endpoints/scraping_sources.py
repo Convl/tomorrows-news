@@ -19,7 +19,7 @@ router = APIRouter()
 async def create_scraping_source(source: ScrapingSourceCreate, db: AsyncSession = Depends(get_db)):
     """Create a new scraping source"""
     # Validate topic exists
-    print("test")
+    
     topic = (
         (
             await db.execute(

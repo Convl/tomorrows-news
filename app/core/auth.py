@@ -24,7 +24,7 @@ SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-produ
 JWT_LIFETIME_SECONDS = int(os.getenv("JWT_LIFETIME_SECONDS", "3600"))  # 1 hour default
 
 # Bearer transport (Authorization: Bearer <token>)
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
+bearer_transport = BearerTransport(tokenUrl="/api/v1/auth/jwt/login")
 
 
 # JWT Strategy
@@ -95,5 +95,5 @@ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db
 fastapi_users = FastAPIUsers[UserDB, uuid.UUID](get_user_manager, [auth_backend])
 
 # Dependencies for current user
-current_active_user = fastapi_users.current_user(active=True)
-current_superuser = fastapi_users.current_user(active=True, superuser=True)
+current_active_user = fastapi_users.current_user(active=True, verified=True)
+current_superuser = fastapi_users.current_user(active=True, verified=True, superuser=True)

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from rich.traceback import install
 
 from app.api.v1.router import api_router
@@ -41,6 +42,9 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Serve static files (frontend)
+app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 @app.get("/")

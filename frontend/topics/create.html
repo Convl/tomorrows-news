@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Topic - Tomorrow's News</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="../assets/css/custom.css" rel="stylesheet">
+</head>
+
+<body class="bg-grey-50">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="../index.html">Tomorrow's News</a>
+
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> <span id="userEmail">Loading...</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12 col-lg-8 mx-auto">
+                <!-- Header -->
+                <div class="d-flex align-items-center mb-4">
+                    <a href="../index.html" class="btn btn-outline-secondary me-3">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </a>
+                    <div>
+                        <h1 class="h3 fw-bold text-dark mb-0">Create New Topic</h1>
+                        <p class="text-taupe mb-0">Define a topic to monitor for news and events</p>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <div class="card shadow">
+                    <div class="card-body p-4">
+                        <form id="createTopicForm">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Topic Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required maxlength="200"
+                                    placeholder="e.g., Climate Change">
+                                <div class="form-text">A clear, descriptive name for your topic (max 200 characters)
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="3"
+                                    placeholder="Describe what kind of news and events you want to monitor for this topic"></textarea>
+                                <div class="form-text">Optional detailed description of your topic</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="keywords" class="form-label">Keywords</label>
+                                <input type="text" class="form-control" id="keywords" name="keywords"
+                                    placeholder="climate change, global warming, carbon emissions">
+                                <div class="form-text">Comma-separated keywords to help identify relevant content</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="country" class="form-label">Country</label>
+                                <input type="text" class="form-control" id="country" name="country" maxlength="200"
+                                    placeholder="e.g., United States, Germany">
+                                <div class="form-text">Focus on news from a specific country (optional)</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                        checked>
+                                    <label class="form-check-label" for="is_active">
+                                        Active Topic
+                                    </label>
+                                    <div class="form-text">Only active topics will be monitored for new content</div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-plus-lg"></i> Create Topic
+                                </button>
+                                <a href="../index.html" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Check authentication
+            if (!requireAuth()) return;
+
+            // Load user info
+            try {
+                const user = await api.get('/users/me');
+                document.getElementById('userEmail').textContent = user.email;
+            } catch (error) {
+                console.error('Failed to load user info:', error);
+            }
+        });
+
+        document.getElementById('createTopicForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const stopLoading = showLoading(submitBtn);
+
+            try {
+                const formData = new FormData(e.target);
+                const topicData = {
+                    name: formData.get('name').trim(),
+                    description: formData.get('description')?.trim() || null,
+                    keywords: formData.get('keywords')?.trim() || null,
+                    country: formData.get('country')?.trim() || null,
+                    is_active: formData.has('is_active')
+                };
+
+                // Basic validation
+                if (!topicData.name) {
+                    throw new Error('Topic name is required');
+                }
+
+                if (topicData.name.length > 200) {
+                    throw new Error('Topic name must be 200 characters or less');
+                }
+
+                await api.post('/topics', topicData);
+
+                showToast('Topic created successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '../index.html';
+                }, 1000);
+
+            } catch (error) {
+                showToast(error.message, 'danger');
+            } finally {
+                stopLoading();
+            }
+        });
+    </script>
+</body>
+
+</html>

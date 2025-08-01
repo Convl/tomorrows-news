@@ -60,6 +60,7 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://localhost:8000",
         "http://localhost:8001",
+        "http://127.0.0.1:8000",
     ]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
@@ -79,7 +80,7 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: SecretStr
 
     # Frontend URL for email links
-    FRONTEND_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:8000/frontend"
 
     class Config:
         env_file = ".env"
