@@ -50,11 +50,7 @@ async def web_sources_from_scraping_source(scraping_source: ScrapingSourceWorkfl
             else:
                 return await extract_sources_from_web(scraping_source)
         case ScrapingSourceEnum.RSS:
-            return await extract_sources_from_rss(
-                scraping_source.base_url,
-                scraping_source.last_scraped_at,
-                degrees_of_separation=1,
-            )
+            return await extract_sources_from_rss(scraping_source)
         case _:
             raise ValueError(f"Unsupported source type: {scraping_source.source_type}")
 
@@ -229,7 +225,10 @@ def uniform_publish_date(publish_date: datetime | None) -> datetime | None:
 
 
 async def download_and_parse_article(
-    url: str, date_according_to_calling_func: datetime = None, prefer_own_publish_date: bool = True, degrees_of_separation: int = 0
+    url: str,
+    date_according_to_calling_func: datetime = None,
+    prefer_own_publish_date: bool = True,
+    degrees_of_separation: int = 0,
 ) -> WebSourceWithMarkdown | None:
     """Download and parse an article from a URL, returning a WebSource object.
 

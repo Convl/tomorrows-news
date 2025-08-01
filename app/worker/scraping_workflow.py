@@ -345,7 +345,6 @@ class Scraper:
     ) -> dict[str, list[WebSourceWithMarkdown] | list]:
         """Extract additional sources from a single web source."""
         # to skip this part, simply return {}
-        print("henlo")
         try:
             # TODO: unpacking source and dict like this this works. Verify if it is consistent with Langgraph design though, or causes problems down the road. If so, encapsulate source in ScrapingState?
             source: WebSourceWithMarkdown = data["source"]
