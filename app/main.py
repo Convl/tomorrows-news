@@ -71,5 +71,5 @@ async def dbg():
     #     await db.commit()
     #     print("Cleared all EventDB, ExtractedEventDB, and EventComparisonDB records")
 
-    scraper = Scraper(12)
+    scraper = Scraper(11)
     await scraper.scrape()

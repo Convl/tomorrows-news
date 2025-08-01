@@ -1,11 +1,25 @@
 import operator
-from datetime import datetime, timedelta, date as dt_date
+from datetime import date as dt_date
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from app.core.enums import ScrapingSourceEnum
 from app.schemas.topic import TopicBase
+
+
+
+class TopicWorkflow(BaseModel):
+    """Topic model for use in workflow state - contains only fields needed for scraping"""
+    id: int
+    name: str
+    description: str
+    country: str
+    language: str | None = None
+
+    class Config:
+        from_attributes = True
 
 
 class ScrapingSourceWorkflow(BaseModel):
@@ -18,18 +32,22 @@ class ScrapingSourceWorkflow(BaseModel):
     language: str | None = None
     last_scraped_at: datetime | None = None
     degrees_of_separation: int = Field(default=0, ge=0)
+    topic: TopicWorkflow
     _visited: bool = PrivateAttr(default=False)  # Whether the source has been visited for source extraction
 
     class Config:
         from_attributes = True
 
-
 class WebSourceBase(BaseModel):
-    """A web source (article, press release, etc.) containing metadata."""
-
+    """A web source (article, press release, etc.)"""
     url: str = Field(description="The full URL of the web source")
-    date: datetime = Field(description="The date when the source was published or last updated")
+    date: datetime | None = Field(default=None, description="The date when the source was published or last updated. Only set if you are certain.")
     title: str | None = Field(default=None, description="The headline or title of the source, if available")
+
+
+class WebSourceWithMetadata(WebSourceBase):
+    """A web source (article, press release, etc.) containing metadata."""
+    date: datetime = Field(description="The date when the source was published or last updated")
     _visited: bool = PrivateAttr(default=False)  # Whether the source has been visited for source extraction
     degrees_of_separation: int = Field(
         description="The number of degrees of separation from the original source", default=0
@@ -46,18 +64,19 @@ class WebSourceBase(BaseModel):
         )
 
 
-class WebSourceWithMarkdown(WebSourceBase):
+class WebSourceWithMarkdown(WebSourceWithMetadata):
     """A web source (article, press release, etc.) containing content and metadata."""
 
     markdown: str = Field(description="The full source's content, converted to markdown format for processing")
 
-class WebSourceExtracted(BaseModel):
-    url: str = Field(description="The full URL of the web source")
-    title: str | None = Field(default=None, description="The headline or title of the source, if available")
-    publish_date: datetime | None = Field(default=None, description="The date when the source was published or last updated")
+
+class ExtractedWebSources(BaseModel):
+    """Web sources extracted from content by LLM."""
+    sources: list[WebSourceBase] = Field(description="A list of web sources extracted from the web source")
 
 class ExtractedUrls(BaseModel):
     urls: list[str] = Field(description="A list of URLs extracted from the web source")
+
 
 class ExtractedEventBase(BaseModel):
     """An event extracted from a web source that is relevant to a specific topic of interest."""
@@ -115,7 +134,7 @@ class ExtractedEventBase(BaseModel):
 class ExtractedEvent(ExtractedEventBase):
     """An event extracted from a web source that is relevant to a specific topic of interest, with the source from which it was extracted."""
 
-    source: WebSourceBase = Field(description="The web source from which the event was extracted")
+    source: WebSourceWithMetadata = Field(description="The web source from which the event was extracted")
 
 
 class ExtractedBaseEvents(BaseModel):
@@ -123,7 +142,9 @@ class ExtractedBaseEvents(BaseModel):
 
 
 class EventMergeResponse(BaseModel):
-    is_same_event: bool = Field(description="Whether the two events refer to the same real-world event. True if they do, False if they do not.")
+    is_same_event: bool = Field(
+        description="Whether the two events refer to the same real-world event. True if they do, False if they do not."
+    )
     merged_title: str | None = Field(
         description="The merged title of the two events, if they refer to the same real-world event. When merging, try to preserve the most important information from both events. However, if there is contradictory information, you should prioritize the information from the second event.",
         default=None,
@@ -133,8 +154,8 @@ class EventMergeResponse(BaseModel):
         default=None,
     )
 
+
 class ScrapingState(BaseModel):
     scraping_source: ScrapingSourceWorkflow = Field(description="The scraping source that is being processed")
     sources: Annotated[list[WebSourceWithMarkdown], operator.add]
     events: Annotated[list[ExtractedEvent], operator.add]
-    topic: TopicBase

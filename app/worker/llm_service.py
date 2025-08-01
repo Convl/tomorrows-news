@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.schemas.topic import TopicBase
 
 from .scraping_config import EVENT_EXTRACTION_SYSTEM_TEMPLATE, SOURCE_EXTRACTION_SYSTEM_TEMPLATE
-from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedUrls
+from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedUrls, ExtractedWebSources
 
 
 class LlmService:
@@ -24,13 +24,15 @@ class LlmService:
         self.llm = ChatOpenAI(
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
-            model_name="moonshotai/kimi-k2",
+            # model_name="moonshotai/kimi-k2",
+            model_name="google/gemini-2.5-pro",
             temperature=0.2,
             rate_limiter=self.rate_limiter,
         )
 
         self.source_extracting_llm = self.llm.with_structured_output(
-            schema=ExtractedUrls,
+            # schema=ExtractedUrls,
+            schema=ExtractedWebSources,
             method="json_schema",
             include_raw=True,
             strict=True,

@@ -10,7 +10,7 @@ Topic description: {topic_description}
 Topic country: {topic_country}
 Notice that today's date is {current_date}.
 You should only extract information about events that will **take place in the future** and are **relevant to the topic**.
-All extracted information should be in {language}.
+All extracted information should be in the following language: {language}.
 Notice that the point of this task is to create a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
 Therefore, you should only extract events which are specific enough to be used as actionable items in a forward planner.
 Examples of events that are specific enough:

@@ -17,7 +17,7 @@ class ScrapingSourceBase(BaseModel):
     description: str | None = None
     degrees_of_separation: int = Field(default=0, ge=0, le=2)
     scraping_config: Dict[str, Any] | None = None
-    scraping_frequency: int = Field(default=60000, ge=1)  # Frequency in minutes, minimum 1
+    scraping_frequency: int = Field(default=60000, ge=1440)  # Frequency in minutes, minimum 1440 = 1 days
     is_active: bool = True
 
 
@@ -32,11 +32,11 @@ class ScrapingSourceUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=200)
     base_url: str | None = Field(None, max_length=500)
-    source_type: str | None = Field(None, max_length=50)
+    source_type: ScrapingSourceEnum | None = None
     country: str | None = Field(None, max_length=100)
     language: str | None = Field(None, max_length=10)
     description: str | None = None
-    degrees_of_separation: int = Field(default=0, ge=0, le=2)
+    degrees_of_separation: int | None = Field(None, ge=0)
     scraping_config: Dict[str, Any] | None = None
     scraping_frequency: int | None = Field(None, ge=1)  # Frequency in minutes, minimum 1
     is_active: bool | None = None
