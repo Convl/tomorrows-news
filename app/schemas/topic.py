@@ -9,8 +9,8 @@ class TopicBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     keywords: str | None = None
-    country: str | None = Field(None, max_length=200)
-    language: str | None = Field(None, max_length=10)
+    country: str | None = Field(None, max_length=200)  # Country name
+    country_code: str | None = Field(None, max_length=10)  # ISO 3166-1 alpha-2
     is_active: bool = True
 
 
@@ -24,7 +24,7 @@ class TopicUpdate(BaseModel):
     description: str | None = None
     keywords: str | None = None
     country: str | None = Field(None, max_length=200)
-    language: str | None = Field(None, max_length=10)
+    country_code: str | None = Field(None, max_length=10)
     is_active: bool | None = None
 
 

@@ -12,8 +12,10 @@ class ScrapingSourceBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     base_url: str = Field(..., max_length=500)
     source_type: ScrapingSourceEnum = Field(...)  # "webpage", "rss", "api"
-    country: str | None = Field(None, max_length=100)
-    language: str | None = Field(None, max_length=10)
+    country: str | None = Field(None, max_length=100)  # Country name
+    country_code: str | None = Field(None, max_length=2)  # ISO 3166-1 alpha-2
+    language: str | None = Field(None, max_length=100)  # Language name
+    language_code: str | None = Field(None, max_length=2)  # ISO 639-1 two-letter
     description: str | None = None
     degrees_of_separation: int = Field(default=0, ge=0, le=2)
     scraping_config: Dict[str, Any] | None = None
@@ -34,7 +36,9 @@ class ScrapingSourceUpdate(BaseModel):
     base_url: str | None = Field(None, max_length=500)
     source_type: ScrapingSourceEnum | None = None
     country: str | None = Field(None, max_length=100)
-    language: str | None = Field(None, max_length=10)
+    country_code: str | None = Field(None, max_length=2)
+    language: str | None = Field(None, max_length=100)
+    language_code: str | None = Field(None, max_length=2)
     description: str | None = None
     degrees_of_separation: int | None = Field(None, ge=0)
     scraping_config: Dict[str, Any] | None = None

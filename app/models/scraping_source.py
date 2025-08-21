@@ -29,8 +29,10 @@ class ScrapingSourceDB(Base):
     )
 
     # Optional metadata
-    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    language: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "de", "en"
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Country name
+    country_code: Mapped[str | None] = mapped_column(String(2), nullable=True, index=True)  # ISO 3166-1 alpha-2
+    language: Mapped[str | None] = mapped_column(String(100), nullable=True)  # Language name
+    language_code: Mapped[str | None] = mapped_column(String(2), nullable=True, index=True)  # ISO 639-1 two-letter
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     degrees_of_separation: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0
@@ -40,7 +42,7 @@ class ScrapingSourceDB(Base):
     scraping_config: Mapped[Dict[str, Any] | None] = mapped_column(
         JSON, nullable=True
     )  # Scraping parameters (selectors, etc.)
-    scraping_frequency: Mapped[int] = mapped_column(Integer, nullable=False, default=60)  # Frequency in minutes
+    scraping_frequency: Mapped[int] = mapped_column(Integer, nullable=False, default=60000)  # Frequency in minutes
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_scraped_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=datetime.datetime(1900, 1, 1)

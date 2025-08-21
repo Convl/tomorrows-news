@@ -14,17 +14,20 @@ from fastapi_users.authentication import (
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.email import EmailService
 from app.database import get_db
 from app.models.user import UserDB
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead, UserUpdate  # noqa: F401
 
 # JWT Configuration
 SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-JWT_LIFETIME_SECONDS = int(os.getenv("JWT_LIFETIME_SECONDS", "3600"))  # 1 hour default
+# Default to 30 days unless overridden by environment
+JWT_LIFETIME_SECONDS = int(os.getenv("JWT_LIFETIME_SECONDS", "2592000"))
 
 # Bearer transport (Authorization: Bearer <token>)
-bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
+# Ensure tokenUrl matches the API prefix so Swagger "Authorize" works
+bearer_transport = BearerTransport(tokenUrl=f"{settings.API_V1_STR}/auth/jwt/login")
 
 
 # JWT Strategy

@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from rich.traceback import install
 
 from app.api.v1.router import api_router
@@ -57,11 +59,21 @@ async def root():
 @app.get("/debug")
 async def dbg():
     print("debug entry hit")
-    from sqlalchemy import delete
-
-    from app.database import get_db_session
-    from app.models import EventComparisonDB, EventDB, ExtractedEventDB
+    # from sqlalchemy import delete
+    # from app.database import get_db_session
+    # from app.models import EventComparisonDB, EventDB, ExtractedEventDB
     from app.worker.scraper import Scraper
+    from datetime import timezone
+    from app.worker.scheduler import scheduler
+
+    for job in scheduler.get_jobs():  # or scheduler.get_jobs(jobstore="scraping")
+        print({
+            "id": job.id,
+            "name": job.name,
+            "trigger": str(job.trigger),
+            "next_run_time": job.next_run_time.astimezone(timezone.utc).isoformat() if job.next_run_time else None,
+        })
+    print("henlo")
 
     # Clear test data before running scraper
     # async with get_db_session() as db:
@@ -71,5 +83,10 @@ async def dbg():
     #     await db.commit()
     #     print("Cleared all EventDB, ExtractedEventDB, and EventComparisonDB records")
 
-    scraper = Scraper(11)
-    await scraper.scrape()
+    # scraper = Scraper(13)
+    # await scraper.scrape()
+
+
+# Mount static frontend at /app
+app.mount("/app", StaticFiles(directory="frontend", html=True), name="frontend")
+

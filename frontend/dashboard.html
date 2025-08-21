@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard • Tomorrow's News</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="/app/assets/theme.css" rel="stylesheet" />
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+        <div class="container">
+            <a class="navbar-brand text-primary" href="/app/dashboard.html">Tomorrow's News</a>
+            <div class="d-flex ms-auto">
+                <button id="logout" class="btn btn-outline-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-5">
+        <div class="main-container">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="icon-placeholder icon-topic me-3">📑</div>
+                    <h1 class="h3 mb-0 fw-semibold">Your Topics</h1>
+                </div>
+                <div class="d-flex gap-2">
+                    <button id="collapse-all-btn" class="btn btn-outline-secondary btn-sm">📋 Collapse All</button>
+                    <a class="btn btn-primary" href="/app/topic-new.html">➕ New Topic</a>
+                </div>
+            </div>
+            <div id="alert" class="alert d-none" role="alert"></div>
+            <div id="topics" class="vstack gap-4"></div>
+        </div>
+    </main>
+
+    <script type="module" src="/app/js/config.js"></script>
+    <script type="module">
+        import { apiBase, getToken, authHeaders, clearToken } from '/app/js/config.js';
+        const alertEl = document.getElementById('alert');
+        const token = getToken();
+        if (!token) { window.location.href = '/app/login.html'; }
+
+        document.getElementById('logout').onclick = () => { clearToken(); window.location.href = '/app/login.html'; };
+
+        async function fetchTopics() {
+            try {
+                const resp = await fetch(`${apiBase}/topics/?limit=100`, { headers: authHeaders() });
+                if (!resp.ok) throw new Error('Failed to load topics');
+                const topics = await resp.json();
+                // Fetch sources and initial upcoming events for each topic in parallel
+                const [sourcesPairs, eventsPairs] = await Promise.all([
+                    Promise.all(topics.map(async (t) => {
+                        try { return [t.id, await fetchSources(t.id)]; } catch { return [t.id, []]; }
+                    })),
+                    Promise.all(topics.map(async (t) => {
+                        try { return [t.id, await fetchUpcomingEvents(t.id, 20, true, 0)]; } catch { return [t.id, []]; }
+                    })),
+                ]);
+                const sourcesByTopic = Object.fromEntries(sourcesPairs);
+                const eventsByTopic = Object.fromEntries(eventsPairs);
+                renderTopics(topics, sourcesByTopic, eventsByTopic);
+                startPolling(topics.map(t => t.id));
+                // Initialize global collapse button state
+                setTimeout(updateCollapseAllButton, 100);
+            } catch (err) {
+                alertEl.textContent = err.message || 'Failed to load topics';
+                alertEl.className = 'alert alert-danger';
+            }
+        }
+
+        async function fetchSources(topicId) {
+            const resp = await fetch(`${apiBase}/scraping-sources/?topic_id=${encodeURIComponent(topicId)}&limit=100`, { headers: authHeaders() });
+            if (!resp.ok) throw new Error('Failed to load sources');
+            return await resp.json();
+        }
+
+        async function fetchUpcomingEvents(topicId, limit = 20, includeExtracted = true, skip = 0) {
+            const params = new URLSearchParams({
+                topic_id: String(topicId),
+                limit: String(limit),
+                skip: String(skip),
+            });
+            if (includeExtracted) params.set('include_extracted', 'true');
+            const resp = await fetch(`${apiBase}/events/?${params.toString()}`, { headers: authHeaders() });
+            if (!resp.ok) throw new Error('Failed to load events');
+            return await resp.json();
+        }
+
+        const topicState = {};
+
+        function renderTopics(topics, sourcesByTopic, eventsByTopic) {
+            const container = document.getElementById('topics');
+            container.innerHTML = '';
+            if (!topics.length) {
+                container.innerHTML = '<div class="text-secondary">No topics yet.</div>';
+                return;
+            }
+            topics.forEach((t) => {
+                const card = document.createElement('div');
+                card.className = 'card topic-card';
+                card.innerHTML = `
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex align-items-start flex-grow-1">
+                  <button class="btn btn-link p-0 me-2 topic-collapse-btn" data-bs-target="#topic-content-${t.id}">
+                    <div class="icon-placeholder icon-topic">📑</div>
+                  </button>
+                  <div class="flex-grow-1" style="cursor: pointer;" data-bs-target="#topic-content-${t.id}">
+                    <h2 class="h5 mb-1">${t.name}</h2>
+                    <div class="text-secondary small">${t.description || ''}</div>
+                  </div>
+                </div>
+                <div class="ms-3 flex-shrink-0">
+                  <button class="btn btn-link btn-sm p-1 me-2 topic-collapse-indicator" data-bs-target="#topic-content-${t.id}">
+                    <span class="collapse-icon">🔽</span>
+                  </button>
+                  <a class="btn btn-sm btn-outline-secondary me-2" href="/app/topic-edit.html?id=${t.id}">✏️ Edit</a>
+                  <a class="btn btn-sm btn-primary" href="/app/source-new.html?topic_id=${t.id}">➕ Add Source</a>
+                </div>
+              </div>
+              
+              <div class="collapse show" id="topic-content-${t.id}">
+                <div class="mt-4" id="sources-${t.id}"></div>
+                <hr class="my-4" />
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h3 class="h6 mb-0 d-flex align-items-center">
+                    <button class="btn btn-link p-0 me-2 events-collapse-btn" data-bs-target="#events-content-${t.id}">
+                      <div class="icon-placeholder icon-event">📅</div>
+                    </button>
+                    <span>Upcoming events</span>
+                    <button class="btn btn-link btn-sm p-1 ms-2 events-collapse-indicator" data-bs-target="#events-content-${t.id}">
+                      <span class="collapse-icon">🔽</span>
+                    </button>
+                  </h3>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="toggle-all-sources-${t.id}">
+                    <label class="form-check-label small" for="toggle-all-sources-${t.id}">Show sources</label>
+                  </div>
+                </div>
+                <div class="collapse show" id="events-content-${t.id}">
+                  <div id="events-${t.id}"></div>
+                  <div class="d-grid mt-3">
+                    <button class="btn btn-outline-secondary btn-sm" id="show-more-${t.id}">Show more</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+                container.appendChild(card);
+                const sources = sourcesByTopic[t.id] || [];
+                const sEl = card.querySelector(`#sources-${t.id}`);
+                if (!sources.length) { sEl.innerHTML = '<div class="text-secondary">No sources.</div>'; }
+                const list = document.createElement('div');
+                list.className = 'list-group list-group-flush';
+                sources.forEach(s => {
+                    const iconMap = { 'Webpage': '🌐', 'Rss': '📡', 'Api': '🔗' };
+                    const iconClass = s.source_type === 'Webpage' ? 'icon-web' : s.source_type === 'Rss' ? 'icon-rss' : 'icon-api';
+                    const row = document.createElement('div');
+                    row.className = 'list-group-item';
+                    row.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center">
+                    <div class="icon-placeholder ${iconClass} me-3">${iconMap[s.source_type] || '🔗'}</div>
+                    <div>
+                      <div class="fw-semibold">${s.name} <span class="badge text-bg-light">${s.source_type}</span></div>
+                      <div class="small text-secondary">${s.base_url}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <a class="btn btn-sm btn-outline-secondary" href="/app/source-edit.html?id=${s.id}">✏️ Edit</a>
+                  </div>
+                </div>`;
+                    list.appendChild(row);
+                });
+                sEl.innerHTML = '';
+                sEl.appendChild(list);
+
+                // Initialize topic state
+                topicState[t.id] = topicState[t.id] || { limit: 20, skip: 0, showSourcesGlobal: false, expanded: new Set(), events: [] };
+                topicState[t.id].events = eventsByTopic[t.id] || [];
+
+                // Render events
+                renderEventsForTopic(t.id);
+
+                // Wire global toggle
+                const toggleAll = card.querySelector(`#toggle-all-sources-${t.id}`);
+                toggleAll.checked = topicState[t.id].showSourcesGlobal;
+                toggleAll.onchange = () => {
+                    topicState[t.id].showSourcesGlobal = !!toggleAll.checked;
+                    renderEventsForTopic(t.id);
+                };
+
+                // Wire Show more
+                const showMoreBtn = card.querySelector(`#show-more-${t.id}`);
+                showMoreBtn.onclick = async () => {
+                    try {
+                        topicState[t.id].limit += 20;
+                        const newEvents = await fetchUpcomingEvents(t.id, 20, true, topicState[t.id].events.length);
+                        topicState[t.id].events = topicState[t.id].events.concat(newEvents);
+                        renderEventsForTopic(t.id);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                // Wire collapse functionality
+                const topicContent = card.querySelector(`#topic-content-${t.id}`);
+                const topicIndicators = card.querySelectorAll('.topic-collapse-indicator .collapse-icon');
+                const topicCollapseButtons = card.querySelectorAll(`[data-bs-target="#topic-content-${t.id}"]`);
+
+                topicCollapseButtons.forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        if (topicContent.classList.contains('show')) {
+                            topicContent.classList.remove('show');
+                            topicIndicators.forEach(icon => icon.textContent = '▶️');
+                        } else {
+                            topicContent.classList.add('show');
+                            topicIndicators.forEach(icon => icon.textContent = '🔽');
+                        }
+                        setTimeout(updateCollapseAllButton, 100);
+                    };
+                });
+
+                const eventsContent = card.querySelector(`#events-content-${t.id}`);
+                const eventsIndicators = card.querySelectorAll('.events-collapse-indicator .collapse-icon');
+                const eventsCollapseButtons = card.querySelectorAll(`[data-bs-target="#events-content-${t.id}"]`);
+
+                eventsCollapseButtons.forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.preventDefault();
+                        if (eventsContent.classList.contains('show')) {
+                            eventsContent.classList.remove('show');
+                            eventsIndicators.forEach(icon => icon.textContent = '▶️');
+                        } else {
+                            eventsContent.classList.add('show');
+                            eventsIndicators.forEach(icon => icon.textContent = '🔽');
+                        }
+                    };
+                });
+            });
+        }
+
+        function renderEventsForTopic(topicId) {
+            const container = document.querySelector(`#events-${topicId}`);
+            const data = topicState[topicId];
+            const events = data.events || [];
+            if (!events.length) {
+                container.innerHTML = '<div class="text-secondary">No upcoming events.</div>';
+                return;
+            }
+            const eventsContainer = document.createElement('div');
+            eventsContainer.className = 'vstack gap-3';
+            events.forEach(ev => {
+                const evId = ev.id;
+                const expanded = data.expanded.has(evId) || data.showSourcesGlobal;
+                const dateStr = new Date(ev.date).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                const addl = ev.additional_infos && Object.entries(ev.additional_infos).length
+                    ? Object.entries(ev.additional_infos).map(([k, v]) => `<span class="badge text-bg-light me-1 mb-1">"${k}: ${v}"</span>`).join(' ')
+                    : '';
+
+                // Determine confidence level styling
+                const confidence = Math.round((ev.significance || 0) * 100);
+                let confidenceClass = 'confidence-low';
+                if (confidence >= 70) confidenceClass = 'confidence-high';
+                else if (confidence >= 60) confidenceClass = 'confidence-medium';
+
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'event-item';
+                eventDiv.innerHTML = `
+                    <div class="d-flex align-items-start gap-3">
+                      <div class="icon-placeholder icon-event flex-shrink-0">📅</div>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                          <div class="flex-grow-1 min-w-0 me-3">
+                            <h4 class="h6 mb-1 fw-semibold">${ev.title}</h4>
+                            <div class="small text-secondary mb-2">
+                              <span class="fw-medium">📅 ${dateStr}</span>
+                              ${ev.location ? ` • <span class="fw-medium">📍 ${ev.location}</span>` : ''}
+                            </div>
+                          </div>
+                          <div class="flex-shrink-0">
+                            <span class="confidence-badge ${confidenceClass}">${confidence}%</span>
+                          </div>
+                        </div>
+                        ${ev.description ? `<div class="mb-3 fw-medium text-dark">${ev.description}</div>` : ''}
+                        ${addl ? `<div class="mb-2"><small class="text-muted fw-medium">Additional Info:</small><br/>${addl}</div>` : ''}
+                        <div class="text-end">
+                          <button class="btn btn-link btn-sm p-0" data-ev="${evId}">
+                            ${expanded ? '🔼 Hide' : '🔽 Show'} sources
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mt-3 ${expanded ? '' : 'd-none'}" id="ev-sources-${evId}"></div>
+                `;
+                eventsContainer.appendChild(eventDiv);
+                // Render extracted events list
+                const tgt = eventDiv.querySelector(`#ev-sources-${evId}`);
+                renderExtractedEvents(tgt, ev.extracted_events || []);
+                // Wire per-event toggle
+                const btn = eventDiv.querySelector(`button[data-ev="${evId}"]`);
+                btn.onclick = () => {
+                    if (data.expanded.has(evId)) data.expanded.delete(evId); else data.expanded.add(evId);
+                    renderEventsForTopic(topicId);
+                };
+            });
+            container.innerHTML = '';
+            container.appendChild(eventsContainer);
+        }
+
+        function renderExtractedEvents(container, extracted) {
+            if (!extracted.length) {
+                container.innerHTML = '<div class="text-secondary small">No sources for this event.</div>';
+                return;
+            }
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'vstack gap-2';
+            extracted.forEach(x => {
+                const dateStr = new Date(x.source_published_date).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                const addl = x.additional_infos && Object.entries(x.additional_infos).length
+                    ? Object.entries(x.additional_infos).map(([k, v]) => `<span class=\"badge text-bg-light me-1 mb-1\">"${k}: ${v}"</span>`).join(' ')
+                    : '';
+                const sourceItem = document.createElement('div');
+                sourceItem.className = 'source-item';
+                sourceItem.innerHTML = `
+                    <div class="d-flex align-items-start">
+                      <div class="icon-placeholder icon-web me-2">🔗</div>
+                      <div class="flex-grow-1">
+                        <div class="fw-semibold small">
+                          <a href="${x.source_url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                            ${x.source_title || 'Article'}
+                          </a>
+                        </div>
+                        <div class="small text-secondary">
+                          📅 Published ${dateStr} • 🔗 hops: ${x.degrees_of_separation}
+                        </div>
+                        ${addl ? `<div class="mt-1">${addl}</div>` : ''}
+                      </div>
+                    </div>
+                `;
+                sourcesDiv.appendChild(sourceItem);
+            });
+            container.innerHTML = '';
+            container.appendChild(sourcesDiv);
+        }
+
+        function startPolling(topicIds) {
+            setInterval(async () => {
+                try {
+                    const pairs = await Promise.all(topicIds.map(async (tid) => {
+                        const limit = topicState[tid]?.events?.length || 20;
+                        const events = await fetchUpcomingEvents(tid, limit, true, 0);
+                        return [tid, events];
+                    }));
+                    for (const [tid, events] of pairs) {
+                        if (!topicState[tid]) continue;
+                        topicState[tid].events = events;
+                        renderEventsForTopic(tid);
+                    }
+                } catch (e) {
+                    console.error('Polling failed', e);
+                }
+            }, 30000);
+        }
+
+        // Global collapse/expand functionality
+        let allCollapsed = false;
+        const collapseAllBtn = document.getElementById('collapse-all-btn');
+
+        function updateCollapseAllButton() {
+            const allTopicCollapses = document.querySelectorAll('[id^="topic-content-"]');
+            const collapsedCount = Array.from(allTopicCollapses).filter(el => !el.classList.contains('show')).length;
+
+            if (collapsedCount === allTopicCollapses.length && allTopicCollapses.length > 0) {
+                allCollapsed = true;
+                collapseAllBtn.innerHTML = '📖 Expand All';
+            } else {
+                allCollapsed = false;
+                collapseAllBtn.innerHTML = '📋 Collapse All';
+            }
+        }
+
+        collapseAllBtn.onclick = () => {
+            const allTopicCollapses = document.querySelectorAll('[id^="topic-content-"]');
+            const allEventCollapses = document.querySelectorAll('[id^="events-content-"]');
+
+            if (allCollapsed) {
+                // Expand all
+                allTopicCollapses.forEach(el => {
+                    el.classList.add('show');
+                });
+                allEventCollapses.forEach(el => {
+                    el.classList.add('show');
+                });
+                // Update indicators
+                document.querySelectorAll('.topic-collapse-indicator .collapse-icon').forEach(icon => {
+                    icon.textContent = '🔽';
+                });
+                document.querySelectorAll('.events-collapse-indicator .collapse-icon').forEach(icon => {
+                    icon.textContent = '🔽';
+                });
+            } else {
+                // Collapse all
+                allTopicCollapses.forEach(el => {
+                    el.classList.remove('show');
+                });
+                // Update indicators
+                document.querySelectorAll('.topic-collapse-indicator .collapse-icon').forEach(icon => {
+                    icon.textContent = '▶️';
+                });
+            }
+
+            // Update button state after a short delay to allow animations to complete
+            setTimeout(updateCollapseAllButton, 100);
+        };
+
+        fetchTopics();
+    </script>
+</body>
+
+</html>
