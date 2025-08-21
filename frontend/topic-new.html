@@ -16,13 +16,12 @@
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-4">
-                        <div class="icon-placeholder icon-topic me-3">📚</div>
                         <h1 class="h4 mb-0 fw-semibold">Create Topic</h1>
                     </div>
                     <div id="alert" class="alert d-none" role="alert"></div>
                     <div id="form"></div>
                     <div class="d-grid gap-2 mt-4">
-                        <button id="submit" class="btn btn-primary">✅ Create Topic</button>
+                        <button id="submit" class="btn btn-primary">Create Topic</button>
                     </div>
                 </div>
             </div>
@@ -39,20 +38,20 @@
         const formRoot = document.getElementById('form');
         formRoot.innerHTML = `
             <div class="mb-4">
-              <label class="form-label" for="name">📝 Name <span class="text-secondary">(required)</span></label>
+              <label class="form-label" for="name">Name <span class="text-secondary">(required)</span></label>
               <input class="form-control" id="name" required placeholder="Enter topic name..." />
             </div>
             <div class="mb-4">
-              <label class="form-label" for="description">📄 Description</label>
+              <label class="form-label" for="description">Description</label>
               <textarea class="form-control" id="description" rows="3" placeholder="Describe what this topic covers..."></textarea>
             </div>
             <div class="mb-4">
-              <label class="form-label" for="country">🌍 Country</label>
+              <label class="form-label" for="country">Country</label>
               <select class="form-select" id="country"></select>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="is_active" checked />
-              <label class="form-check-label fw-medium" for="is_active">✅ Active</label>
+              <label class="form-check-label fw-medium" for="is_active">Active</label>
             </div>
         `;
         const submitBtn = document.getElementById('submit');

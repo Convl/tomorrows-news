@@ -91,8 +91,7 @@ async def extract_sources_from_web(scraping_source: ScrapingSourceWorkflow) -> l
         response = await llm_service.source_extracting_llm.ainvoke(messages)
         extracted_sources: list[WebSourceBase] = response["parsed"].sources
 
-        # TODO: remove :3, only filter by last_scraped_at
-        for extracted_source in extracted_sources[:3]:
+        for extracted_source in extracted_sources:
             # Below check avoids parsing unnecessary articles. Commented out for now because LLM-determined date from listings page might not be reliable enough
             # if extracted_source.date and extracted_source.date < scraping_source.last_scraped_at:
             #     continue
@@ -153,7 +152,7 @@ def _is_article_html_good_quality(article_html: str, full_html: str) -> bool:
     # Should be substantial content but not the entire page
     min_length = 1000  # At least 1000 chars
     max_ratio = 0.8  # Not more than 80% of full page
-    min_ratio = 0.1  # At least 10% of full page
+    min_ratio = 0.03  # At least 3% of full page
 
     if article_len < min_length:
         return False
@@ -176,8 +175,7 @@ async def extract_sources_from_rss(scraping_source: ScrapingSourceDB) -> list[We
     feed = await asyncio.to_thread(feedparser.parse, scraping_source.base_url)
     sources = []
 
-    # TODO: Remove [:1], filter by last_scraped_at instead
-    for entry in feed.entries[:3]:
+    for entry in feed.entries:
         if not entry.link:
             continue
 

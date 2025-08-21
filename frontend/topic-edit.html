@@ -23,6 +23,7 @@
                     <div id="form"></div>
                     <div class="d-grid gap-2 mt-4">
                         <button id="save" class="btn btn-primary">💾 Save Changes</button>
+                        <button id="delete" class="btn btn-outline-danger">🗑️ Delete Topic</button>
                     </div>
                 </div>
             </div>
@@ -54,7 +55,7 @@
             </div>
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="is_active" />
-              <label class="form-check-label fw-medium" for="is_active">✅ Active</label>
+              <label class="form-check-label fw-medium" for="is_active">Active</label>
             </div>
         `;
         const saveBtn = document.getElementById('save');
@@ -95,6 +96,45 @@
                 alertEl.className = 'alert alert-danger';
             }
         };
+
+        // Delete functionality
+        const deleteBtn = document.getElementById('delete');
+        deleteBtn.onclick = async () => {
+            const topicName = original?.name || 'this topic';
+            const confirmed = confirm(`⚠️ Are you sure you want to delete "${topicName}"?\n\nThis action cannot be undone and will also delete all associated feeds and events.`);
+
+            if (!confirmed) return;
+
+            alertEl.className = 'alert d-none';
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = '🗑️ Deleting...';
+
+            try {
+                const resp = await fetch(`${apiBase}/topics/${id}`, {
+                    method: 'DELETE',
+                    headers: authHeaders()
+                });
+
+                if (!resp.ok) {
+                    const error = await resp.text();
+                    throw new Error(error || 'Failed to delete topic');
+                }
+
+                alertEl.textContent = '✅ Topic deleted successfully. Redirecting...';
+                alertEl.className = 'alert alert-success';
+
+                setTimeout(() => {
+                    window.location.href = '/app/dashboard.html';
+                }, 1500);
+
+            } catch (err) {
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = '🗑️ Delete Topic';
+                alertEl.textContent = err.message || 'Failed to delete topic';
+                alertEl.className = 'alert alert-danger';
+            }
+        };
+
         init();
     </script>
 </body>

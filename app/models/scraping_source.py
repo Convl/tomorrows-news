@@ -1,8 +1,6 @@
 import datetime
 from typing import TYPE_CHECKING, Any, Dict
 
-import apscheduler
-from apscheduler.job import Job
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, event
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -84,13 +82,14 @@ class ScrapingSourceDB(Base):
             from app.worker.scheduler import scheduler
             from app.worker.scraper import Scraper
 
-            print(f"Scheduling job for source {self.id}")
+            print(f"Scheduling job for source {self.id} with {self.scraping_frequency} minute interval")
             scheduler.add_job(
                 func=Scraper.scrape_source,
                 args=[self.id],
                 trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 id=self.job_id,
                 jobstore=self.jobstore,
+                executor="scraping",  # Use the async executor
                 replace_existing=True,
             )
 

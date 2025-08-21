@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+import datetime
 
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_openai import ChatOpenAI
@@ -25,7 +25,8 @@ class LlmService:
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
             # model_name="moonshotai/kimi-k2",
-            model_name="google/gemini-2.5-pro",
+            # model_name="google/gemini-2.5-pro",
+            model_name="openai/gpt-5-mini",
             temperature=0.2,
             rate_limiter=self.rate_limiter,
         )
@@ -58,7 +59,7 @@ class LlmService:
             topic_name=topic.name,
             topic_description=topic.description,
             topic_country=topic.country,
-            current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            current_date=datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d. of %B %Y"),
             language=language,
         )
 

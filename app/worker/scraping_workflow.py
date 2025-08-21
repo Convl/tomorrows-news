@@ -491,11 +491,22 @@ class Scraper:
         await self._prepare_scraper()
         await self.graph.ainvoke(self.scraping_state)
 
-        # async with get_db_session() as db:
-        #     self.scraping_source.last_scraped_at = datetime.now(timezone.utc)
-        #     db.add(self.scraping_source)
-        #     await db.commit()
-        #     await db.refresh(self.scraping_source)
+        async with get_db_session() as db:
+            scraping_source: ScrapingSourceDB = (
+                (
+                    await db.execute(
+                        select(ScrapingSourceDB)
+                        .options(selectinload(ScrapingSourceDB.topic))
+                        .where(ScrapingSourceDB.id == self.scraping_source_id)
+                    )
+                )
+                .scalars()
+                .one_or_none()
+            )
+            scraping_source.last_scraped_at = datetime.now(timezone.utc)
+            db.add(scraping_source)
+            await db.commit()
+            await db.refresh(scraping_source)
 
     async def _prepare_scraper(self, checkpointer: AsyncPostgresSaver | None = None):
         async with get_db_session() as db:
@@ -582,5 +593,20 @@ class Scraper:
 
     @classmethod
     async def scrape_source(cls, source_id: int):
-        scraper = cls(source_id)
-        await scraper.scrape()
+        """Entry point for scheduled scraping jobs"""
+        from datetime import datetime
+
+        try:
+            start_time = datetime.now()
+            print(f"Starting scrape job for source {source_id} at {start_time}")
+
+            scraper = cls(source_id)
+            await scraper.scrape()
+
+            end_time = datetime.now()
+            duration = end_time - start_time
+            print(f"Completed scrape job for source {source_id} in {duration}")
+
+        except Exception as e:
+            print(f"Scrape job failed for source {source_id}: {e}")
+            raise  # so apscheduler logs the failure

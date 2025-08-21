@@ -342,34 +342,32 @@ h6 {
    COLLAPSE FUNCTIONALITY STYLING
    ============================================================================ */
 
-.topic-collapse-btn,
-.events-collapse-btn {
-    color: var(--tn-grey);
-    text-decoration: none;
-    transition: color 0.15s ease-in-out;
-}
-
-.topic-collapse-btn:hover,
-.events-collapse-btn:hover {
-    color: var(--tn-primary);
-}
-
-.topic-collapse-indicator,
-.events-collapse-indicator {
-    color: var(--tn-grey);
-    font-size: 0.75rem;
+/* Enhanced form switches for consistent collapse controls */
+.form-switch .form-check-input {
+    background-color: var(--tn-grey-light);
+    border-color: var(--tn-border);
     transition: all 0.15s ease-in-out;
 }
 
-.topic-collapse-indicator:hover,
-.events-collapse-indicator:hover {
-    color: var(--tn-primary);
-    transform: scale(1.1);
+.form-switch .form-check-input:checked {
+    background-color: var(--tn-primary);
+    border-color: var(--tn-primary);
 }
 
-.collapse-icon {
-    display: inline-block;
-    transition: transform 0.2s ease-in-out;
+.form-switch .form-check-input:focus {
+    border-color: var(--tn-primary);
+    box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.25);
+}
+
+.form-check-label {
+    color: var(--tn-grey-dark);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease-in-out;
+}
+
+.form-check-label:hover {
+    color: var(--tn-primary);
 }
 
 /* Smooth collapse transitions */
@@ -381,6 +379,55 @@ h6 {
     height: 0;
     overflow: hidden;
     transition: height 0.35s ease;
+}
+
+/* ============================================================================
+   EVENT SORTING CONTROLS STYLING
+   ============================================================================ */
+
+.event-sort-field {
+    min-width: 110px;
+    font-size: 0.75rem;
+}
+
+.event-sort-direction {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    border-radius: 0.25rem;
+    transition: all 0.15s ease-in-out;
+    min-width: 90px;
+    white-space: nowrap;
+}
+
+.event-sort-direction:hover {
+    background-color: var(--tn-grey-light);
+    border-color: var(--tn-primary);
+}
+
+.sort-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: inline-block;
+    transition: all 0.15s ease-in-out;
+}
+
+.event-sort-direction:hover .sort-text {
+    color: var(--tn-primary);
+}
+
+/* ============================================================================
+   TOOLTIP STYLING
+   ============================================================================ */
+
+.confidence-badge {
+    cursor: help;
+    position: relative;
+}
+
+.confidence-badge:hover {
+    transform: scale(1.05);
+    transition: transform 0.15s ease-in-out;
 }
 
 /* ============================================================================

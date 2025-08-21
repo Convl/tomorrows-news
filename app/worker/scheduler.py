@@ -21,4 +21,10 @@ scheduler_engine = create_engine(
 )
 jobstore = {"scraping": SQLAlchemyJobStore(engine=scheduler_engine)}
 executors = {"scraping": AsyncIOExecutor()}
-scheduler = AsyncIOScheduler(jobstores=jobstore, executors=executors)
+
+job_defaults = {
+    "coalesce": True,  # Combine multiple missed executions into one
+    "misfire_grace_time": 300,  # Allow jobs to be 5 minutes late before considering them missed
+}
+
+scheduler = AsyncIOScheduler(jobstores=jobstore, executors=executors, job_defaults=job_defaults)

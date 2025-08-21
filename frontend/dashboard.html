@@ -26,8 +26,11 @@
                     <div class="icon-placeholder icon-topic me-3">📑</div>
                     <h1 class="h3 mb-0 fw-semibold">Your Topics</h1>
                 </div>
-                <div class="d-flex gap-2">
-                    <button id="collapse-all-btn" class="btn btn-outline-secondary btn-sm">📋 Collapse All</button>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="collapse-all-switch" checked>
+                        <label class="form-check-label small" for="collapse-all-switch">Expand all topics</label>
+                    </div>
                     <a class="btn btn-primary" href="/app/topic-new.html">➕ New Topic</a>
                 </div>
             </div>
@@ -63,8 +66,8 @@
                 const eventsByTopic = Object.fromEntries(eventsPairs);
                 renderTopics(topics, sourcesByTopic, eventsByTopic);
                 startPolling(topics.map(t => t.id));
-                // Initialize global collapse button state
-                setTimeout(updateCollapseAllButton, 100);
+                // Initialize global collapse switch state
+                setTimeout(updateCollapseAllSwitch, 100);
             } catch (err) {
                 alertEl.textContent = err.message || 'Failed to load topics';
                 alertEl.className = 'alert alert-danger';
@@ -91,6 +94,34 @@
 
         const topicState = {};
 
+        // Sort state: default to date ascending
+        const sortState = {
+            field: 'date',      // 'date' or 'significance'
+            direction: 'asc'    // 'asc' or 'desc'
+        };
+
+        function sortEvents(events, field = 'date', direction = 'asc') {
+            const sortedEvents = [...events].sort((a, b) => {
+                let valueA, valueB;
+
+                if (field === 'date') {
+                    valueA = new Date(a.date);
+                    valueB = new Date(b.date);
+                } else if (field === 'significance') {
+                    valueA = a.significance || 0;
+                    valueB = b.significance || 0;
+                }
+
+                if (direction === 'asc') {
+                    return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+                } else {
+                    return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+                }
+            });
+
+            return sortedEvents;
+        }
+
         function renderTopics(topics, sourcesByTopic, eventsByTopic) {
             const container = document.getElementById('topics');
             container.innerHTML = '';
@@ -105,39 +136,63 @@
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start">
                 <div class="d-flex align-items-start flex-grow-1">
-                  <button class="btn btn-link p-0 me-2 topic-collapse-btn" data-bs-target="#topic-content-${t.id}">
-                    <div class="icon-placeholder icon-topic">📑</div>
-                  </button>
-                  <div class="flex-grow-1" style="cursor: pointer;" data-bs-target="#topic-content-${t.id}">
+                  <div class="icon-placeholder icon-topic me-3">📑</div>
+                  <div class="flex-grow-1">
                     <h2 class="h5 mb-1">${t.name}</h2>
                     <div class="text-secondary small">${t.description || ''}</div>
                   </div>
                 </div>
-                <div class="ms-3 flex-shrink-0">
-                  <button class="btn btn-link btn-sm p-1 me-2 topic-collapse-indicator" data-bs-target="#topic-content-${t.id}">
-                    <span class="collapse-icon">🔽</span>
-                  </button>
-                  <a class="btn btn-sm btn-outline-secondary me-2" href="/app/topic-edit.html?id=${t.id}">✏️ Edit</a>
-                  <a class="btn btn-sm btn-primary" href="/app/source-new.html?topic_id=${t.id}">➕ Add Source</a>
+                <div class="ms-3 flex-shrink-0 d-flex align-items-start gap-3">
+                  <div class="form-check form-switch mt-1">
+                    <input class="form-check-input" type="checkbox" id="topic-expand-${t.id}" checked>
+                    <label class="form-check-label small" for="topic-expand-${t.id}">Expand topic</label>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-secondary" href="/app/topic-edit.html?id=${t.id}">✏️ Edit</a>
+                    <a class="btn btn-sm btn-primary" href="/app/source-new.html?topic_id=${t.id}">➕ Add Feed</a>
+                  </div>
                 </div>
               </div>
               
               <div class="collapse show" id="topic-content-${t.id}">
-                <div class="mt-4" id="sources-${t.id}"></div>
+                <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+                  <h3 class="h6 mb-0 d-flex align-items-center">
+                    <div class="icon-placeholder icon-topic me-2">📡</div>
+                    <span>Feeds <span class="text-muted" id="feeds-count-${t.id}"></span></span>
+                  </h3>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="sources-expand-${t.id}" checked>
+                    <label class="form-check-label small" for="sources-expand-${t.id}">Expand feeds</label>
+                  </div>
+                </div>
+                <div class="collapse show" id="sources-content-${t.id}">
+                  <div id="sources-${t.id}"></div>
+                </div>
                 <hr class="my-4" />
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <h3 class="h6 mb-0 d-flex align-items-center">
-                    <button class="btn btn-link p-0 me-2 events-collapse-btn" data-bs-target="#events-content-${t.id}">
-                      <div class="icon-placeholder icon-event">📅</div>
-                    </button>
-                    <span>Upcoming events</span>
-                    <button class="btn btn-link btn-sm p-1 ms-2 events-collapse-indicator" data-bs-target="#events-content-${t.id}">
-                      <span class="collapse-icon">🔽</span>
-                    </button>
+                    <div class="icon-placeholder icon-event me-2">📅</div>
+                    <span>Upcoming events <span class="text-muted" id="events-count-${t.id}"></span></span>
                   </h3>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="toggle-all-sources-${t.id}">
-                    <label class="form-check-label small" for="toggle-all-sources-${t.id}">Show sources</label>
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="events-expand-${t.id}" checked>
+                      <label class="form-check-label small" for="events-expand-${t.id}">Expand events</label>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="small text-muted">Sort:</span>
+                      <select class="form-select form-select-sm event-sort-field" id="sort-field-${t.id}" style="width: auto;">
+                        <option value="date">Date</option>
+                        <option value="significance">Significance</option>
+                      </select>
+                      <button class="btn btn-outline-secondary btn-sm event-sort-direction" id="sort-direction-${t.id}" title="Toggle sort direction">
+                        <span class="sort-text">Ascending</span>
+                      </button>
+                    </div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" id="toggle-all-sources-${t.id}">
+                      <label class="form-check-label small" for="toggle-all-sources-${t.id}">Show all sources</label>
+                    </div>
                   </div>
                 </div>
                 <div class="collapse show" id="events-content-${t.id}">
@@ -152,7 +207,12 @@
                 container.appendChild(card);
                 const sources = sourcesByTopic[t.id] || [];
                 const sEl = card.querySelector(`#sources-${t.id}`);
-                if (!sources.length) { sEl.innerHTML = '<div class="text-secondary">No sources.</div>'; }
+                if (!sources.length) {
+                    sEl.innerHTML = '<div class="text-secondary">No sources.</div>';
+                    // Update feeds count for empty case
+                    const feedsCountEl = card.querySelector(`#feeds-count-${t.id}`);
+                    feedsCountEl.textContent = '';
+                }
                 const list = document.createElement('div');
                 list.className = 'list-group list-group-flush';
                 sources.forEach(s => {
@@ -177,6 +237,10 @@
                 });
                 sEl.innerHTML = '';
                 sEl.appendChild(list);
+
+                // Update feeds count
+                const feedsCountEl = card.querySelector(`#feeds-count-${t.id}`);
+                feedsCountEl.textContent = sources.length > 0 ? `(${sources.length})` : '';
 
                 // Initialize topic state
                 topicState[t.id] = topicState[t.id] || { limit: 20, skip: 0, showSourcesGlobal: false, expanded: new Set(), events: [] };
@@ -207,51 +271,105 @@
                 };
 
                 // Wire collapse functionality
+                // Wire topic collapse switch
                 const topicContent = card.querySelector(`#topic-content-${t.id}`);
-                const topicIndicators = card.querySelectorAll('.topic-collapse-indicator .collapse-icon');
-                const topicCollapseButtons = card.querySelectorAll(`[data-bs-target="#topic-content-${t.id}"]`);
+                const topicSwitch = card.querySelector(`#topic-expand-${t.id}`);
+                const topicLabel = card.querySelector(`label[for="topic-expand-${t.id}"]`);
 
-                topicCollapseButtons.forEach(btn => {
-                    btn.onclick = (e) => {
-                        e.preventDefault();
-                        if (topicContent.classList.contains('show')) {
-                            topicContent.classList.remove('show');
-                            topicIndicators.forEach(icon => icon.textContent = '▶️');
-                        } else {
-                            topicContent.classList.add('show');
-                            topicIndicators.forEach(icon => icon.textContent = '🔽');
-                        }
-                        setTimeout(updateCollapseAllButton, 100);
-                    };
-                });
+                topicSwitch.onchange = () => {
+                    if (topicSwitch.checked) {
+                        topicContent.classList.add('show');
+                        topicLabel.textContent = 'Expand topic';
+                    } else {
+                        topicContent.classList.remove('show');
+                        topicLabel.textContent = 'Collapse topic';
+                    }
+                    setTimeout(updateCollapseAllSwitch, 100);
+                };
 
+                // Wire sources collapse switch
+                const sourcesContent = card.querySelector(`#sources-content-${t.id}`);
+                const sourcesSwitch = card.querySelector(`#sources-expand-${t.id}`);
+                const sourcesLabel = card.querySelector(`label[for="sources-expand-${t.id}"]`);
+
+                sourcesSwitch.onchange = () => {
+                    if (sourcesSwitch.checked) {
+                        sourcesContent.classList.add('show');
+                        sourcesLabel.textContent = 'Expand feeds';
+                    } else {
+                        sourcesContent.classList.remove('show');
+                        sourcesLabel.textContent = 'Collapse feeds';
+                    }
+                };
+
+                // Wire events collapse switch
                 const eventsContent = card.querySelector(`#events-content-${t.id}`);
-                const eventsIndicators = card.querySelectorAll('.events-collapse-indicator .collapse-icon');
-                const eventsCollapseButtons = card.querySelectorAll(`[data-bs-target="#events-content-${t.id}"]`);
+                const eventsSwitch = card.querySelector(`#events-expand-${t.id}`);
+                const eventsLabel = card.querySelector(`label[for="events-expand-${t.id}"]`);
 
-                eventsCollapseButtons.forEach(btn => {
-                    btn.onclick = (e) => {
-                        e.preventDefault();
-                        if (eventsContent.classList.contains('show')) {
-                            eventsContent.classList.remove('show');
-                            eventsIndicators.forEach(icon => icon.textContent = '▶️');
-                        } else {
-                            eventsContent.classList.add('show');
-                            eventsIndicators.forEach(icon => icon.textContent = '🔽');
-                        }
-                    };
-                });
+                eventsSwitch.onchange = () => {
+                    if (eventsSwitch.checked) {
+                        eventsContent.classList.add('show');
+                        eventsLabel.textContent = 'Expand events';
+                    } else {
+                        eventsContent.classList.remove('show');
+                        eventsLabel.textContent = 'Collapse events';
+                    }
+                };
+
+                // Wire sorting controls
+                const sortFieldSelect = card.querySelector(`#sort-field-${t.id}`);
+                const sortDirectionBtn = card.querySelector(`#sort-direction-${t.id}`);
+                const sortText = sortDirectionBtn.querySelector('.sort-text');
+
+                // Initialize topic sorting state
+                if (!topicState[t.id].sortField) {
+                    topicState[t.id].sortField = sortState.field;
+                    topicState[t.id].sortDirection = sortState.direction;
+                }
+
+                // Set initial UI state
+                sortFieldSelect.value = topicState[t.id].sortField;
+                sortText.textContent = topicState[t.id].sortDirection === 'asc' ? 'Ascending' : 'Descending';
+                sortDirectionBtn.title = `Sort ${topicState[t.id].sortDirection === 'asc' ? 'ascending' : 'descending'}`;
+
+                // Sort field change handler
+                sortFieldSelect.onchange = () => {
+                    topicState[t.id].sortField = sortFieldSelect.value;
+                    renderEventsForTopic(t.id);
+                };
+
+                // Sort direction toggle handler
+                sortDirectionBtn.onclick = () => {
+                    const currentDirection = topicState[t.id].sortDirection;
+                    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+                    topicState[t.id].sortDirection = newDirection;
+
+                    // Update UI
+                    sortText.textContent = newDirection === 'asc' ? 'Ascending' : 'Descending';
+                    sortDirectionBtn.title = `Sort ${newDirection === 'asc' ? 'ascending' : 'descending'}`;
+
+                    renderEventsForTopic(t.id);
+                };
             });
         }
 
         function renderEventsForTopic(topicId) {
             const container = document.querySelector(`#events-${topicId}`);
             const data = topicState[topicId];
-            const events = data.events || [];
-            if (!events.length) {
+            const rawEvents = data.events || [];
+            if (!rawEvents.length) {
                 container.innerHTML = '<div class="text-secondary">No upcoming events.</div>';
+                // Update events count
+                const eventsCountEl = document.querySelector(`#events-count-${topicId}`);
+                eventsCountEl.textContent = '';
                 return;
             }
+
+            // Apply sorting
+            const sortField = data.sortField || sortState.field;
+            const sortDirection = data.sortDirection || sortState.direction;
+            const events = sortEvents(rawEvents, sortField, sortDirection);
             const eventsContainer = document.createElement('div');
             eventsContainer.className = 'vstack gap-3';
             events.forEach(ev => {
@@ -286,15 +404,16 @@
                             </div>
                           </div>
                           <div class="flex-shrink-0">
-                            <span class="confidence-badge ${confidenceClass}">${confidence}%</span>
+                            <span class="confidence-badge ${confidenceClass}" title="Significance rating for this event, based on the nature of the event, its importance to the topic, and the likelihood of the event coming to pass">${confidence}%</span>
                           </div>
                         </div>
                         ${ev.description ? `<div class="mb-3 fw-medium text-dark">${ev.description}</div>` : ''}
                         ${addl ? `<div class="mb-2"><small class="text-muted fw-medium">Additional Info:</small><br/>${addl}</div>` : ''}
                         <div class="text-end">
-                          <button class="btn btn-link btn-sm p-0" data-ev="${evId}">
-                            ${expanded ? '🔼 Hide' : '🔽 Show'} sources
-                          </button>
+                          <div class="form-check form-switch d-inline-flex align-items-center">
+                            <input class="form-check-input" type="checkbox" id="event-sources-${evId}" ${expanded ? 'checked' : ''}>
+                            <label class="form-check-label small ms-2" for="event-sources-${evId}">${expanded ? 'Hide sources' : 'Show sources'}</label>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -305,14 +424,25 @@
                 const tgt = eventDiv.querySelector(`#ev-sources-${evId}`);
                 renderExtractedEvents(tgt, ev.extracted_events || []);
                 // Wire per-event toggle
-                const btn = eventDiv.querySelector(`button[data-ev="${evId}"]`);
-                btn.onclick = () => {
-                    if (data.expanded.has(evId)) data.expanded.delete(evId); else data.expanded.add(evId);
+                const sourceSwitch = eventDiv.querySelector(`#event-sources-${evId}`);
+                const sourceLabel = eventDiv.querySelector(`label[for="event-sources-${evId}"]`);
+                sourceSwitch.onchange = () => {
+                    if (sourceSwitch.checked) {
+                        data.expanded.add(evId);
+                        sourceLabel.textContent = 'Show sources';
+                    } else {
+                        data.expanded.delete(evId);
+                        sourceLabel.textContent = 'Hide sources';
+                    }
                     renderEventsForTopic(topicId);
                 };
             });
             container.innerHTML = '';
             container.appendChild(eventsContainer);
+
+            // Update events count
+            const eventsCountEl = document.querySelector(`#events-count-${topicId}`);
+            eventsCountEl.textContent = events.length > 0 ? `(${events.length})` : '';
         }
 
         function renderExtractedEvents(container, extracted) {
@@ -374,54 +504,89 @@
         }
 
         // Global collapse/expand functionality
-        let allCollapsed = false;
-        const collapseAllBtn = document.getElementById('collapse-all-btn');
+        const collapseAllSwitch = document.getElementById('collapse-all-switch');
+        const collapseAllLabel = document.querySelector('label[for="collapse-all-switch"]');
 
-        function updateCollapseAllButton() {
+        function updateCollapseAllSwitch() {
             const allTopicCollapses = document.querySelectorAll('[id^="topic-content-"]');
-            const collapsedCount = Array.from(allTopicCollapses).filter(el => !el.classList.contains('show')).length;
+            const expandedCount = Array.from(allTopicCollapses).filter(el => el.classList.contains('show')).length;
 
-            if (collapsedCount === allTopicCollapses.length && allTopicCollapses.length > 0) {
-                allCollapsed = true;
-                collapseAllBtn.innerHTML = '📖 Expand All';
+            if (expandedCount === allTopicCollapses.length && allTopicCollapses.length > 0) {
+                collapseAllSwitch.checked = true;
+                collapseAllLabel.textContent = 'Expand all topics';
+            } else if (expandedCount === 0 && allTopicCollapses.length > 0) {
+                collapseAllSwitch.checked = false;
+                collapseAllLabel.textContent = 'Collapse all topics';
             } else {
-                allCollapsed = false;
-                collapseAllBtn.innerHTML = '📋 Collapse All';
+                // Mixed state - some expanded, some collapsed
+                collapseAllSwitch.checked = false;
+                collapseAllLabel.textContent = 'Expand all topics';
             }
         }
 
-        collapseAllBtn.onclick = () => {
+        collapseAllSwitch.onchange = () => {
+            const shouldExpand = collapseAllSwitch.checked;
             const allTopicCollapses = document.querySelectorAll('[id^="topic-content-"]');
+            const allSourceCollapses = document.querySelectorAll('[id^="sources-content-"]');
             const allEventCollapses = document.querySelectorAll('[id^="events-content-"]');
 
-            if (allCollapsed) {
+            if (shouldExpand) {
                 // Expand all
                 allTopicCollapses.forEach(el => {
+                    el.classList.add('show');
+                });
+                allSourceCollapses.forEach(el => {
                     el.classList.add('show');
                 });
                 allEventCollapses.forEach(el => {
                     el.classList.add('show');
                 });
-                // Update indicators
-                document.querySelectorAll('.topic-collapse-indicator .collapse-icon').forEach(icon => {
-                    icon.textContent = '🔽';
+                collapseAllLabel.textContent = 'Expand all topics';
+                // Update individual switches
+                document.querySelectorAll('[id^="topic-expand-"]').forEach(switchEl => {
+                    switchEl.checked = true;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Expand topic';
                 });
-                document.querySelectorAll('.events-collapse-indicator .collapse-icon').forEach(icon => {
-                    icon.textContent = '🔽';
+                document.querySelectorAll('[id^="sources-expand-"]').forEach(switchEl => {
+                    switchEl.checked = true;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Expand feeds';
+                });
+                document.querySelectorAll('[id^="events-expand-"]').forEach(switchEl => {
+                    switchEl.checked = true;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Expand events';
                 });
             } else {
                 // Collapse all
                 allTopicCollapses.forEach(el => {
                     el.classList.remove('show');
                 });
-                // Update indicators
-                document.querySelectorAll('.topic-collapse-indicator .collapse-icon').forEach(icon => {
-                    icon.textContent = '▶️';
+                allSourceCollapses.forEach(el => {
+                    el.classList.remove('show');
+                });
+                allEventCollapses.forEach(el => {
+                    el.classList.remove('show');
+                });
+                collapseAllLabel.textContent = 'Collapse all topics';
+                // Update individual switches
+                document.querySelectorAll('[id^="topic-expand-"]').forEach(switchEl => {
+                    switchEl.checked = false;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Collapse topic';
+                });
+                document.querySelectorAll('[id^="sources-expand-"]').forEach(switchEl => {
+                    switchEl.checked = false;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Collapse feeds';
+                });
+                document.querySelectorAll('[id^="events-expand-"]').forEach(switchEl => {
+                    switchEl.checked = false;
+                    const label = document.querySelector(`label[for="${switchEl.id}"]`);
+                    if (label) label.textContent = 'Collapse events';
                 });
             }
-
-            // Update button state after a short delay to allow animations to complete
-            setTimeout(updateCollapseAllButton, 100);
         };
 
         fetchTopics();
