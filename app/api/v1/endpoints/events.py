@@ -162,7 +162,7 @@ async def list_events(
                     created_at=e.created_at,
                     update_history=e.update_history,
                     topic_id=e.topic_id,
-                    extracted_events=[],
+                    extracted_events=[],  # empty by default when not including
                 )
             )
         return results

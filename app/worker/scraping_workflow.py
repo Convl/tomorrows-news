@@ -412,9 +412,16 @@ class Scraper:
         state: ScrapingState = data["state"]
 
         print(f"Extracting events from source: {source.url}")
+
+        event_extraction_message = await self.llm_service.get_event_extraction_system_message(
+            topic=state.scraping_source.topic,
+            language=state.scraping_source.language,
+            publish_date=source.date,
+        )
+
         messages = [
-            self.event_extraction_system_message,
-            HumanMessage(f"Extract events from the following webpage: {source.markdown}"),
+            event_extraction_message,
+            HumanMessage(f"Extract events from the following webpage: \n{source.markdown}"),
         ]
         try:
             response = await self.llm_service.event_extracting_llm.ainvoke(messages)
@@ -526,10 +533,7 @@ class Scraper:
             # Initialize LLM service
             self.llm_service = LlmService()
 
-            # Create system messages using the LLM service
-            self.event_extraction_system_message = await self.llm_service.get_event_extraction_system_message(
-                scraping_source_workflow.topic, scraping_source_workflow.language
-            )
+            # This message, unlike the one for event extraction, is static, so we can create it here
             self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
                 scraping_source_workflow.topic
             )

@@ -322,6 +322,26 @@ h6 {
     background-color: var(--tn-grey-light);
 }
 
+/* Minimal view specific styles */
+.event-item-minimal-clickable {
+    transition: all 0.15s ease-in-out;
+}
+
+.event-item-minimal-clickable:hover {
+    background-color: var(--tn-grey-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.event-item-expanded-in-minimal {
+    border-left: 3px solid var(--tn-primary);
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.event-item-expanded-in-minimal:hover {
+    background-color: rgba(37, 99, 235, 0.1);
+}
+
 .source-item {
     background-color: var(--tn-grey-light);
     border-radius: 0.375rem;
@@ -336,6 +356,135 @@ h6 {
 
 .text-dark {
     color: var(--tn-grey-dark) !important;
+}
+
+/* Text overflow handling */
+.text-overflow-container {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+}
+
+.badge-container {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    line-height: 1.4;
+    text-align: left;
+}
+
+.badge-container .badge {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    word-wrap: break-word;
+    margin: 0.1rem 0.25rem 0.1rem 0;
+    vertical-align: top;
+    text-align: left;
+}
+
+/* ============================================================================
+   CONTROL PANEL IMPROVEMENTS
+   ============================================================================ */
+
+/* Compact control panels for reduced visual clutter */
+.control-panel {
+    background-color: var(--tn-grey-light);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--tn-border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.control-panel-compact {
+    background-color: rgba(248, 250, 252, 0.8);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--tn-border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.control-group-divider {
+    width: 1px;
+    height: 1.25rem;
+    background-color: var(--tn-border);
+    flex-shrink: 0;
+}
+
+/* Compact toggle switches */
+.form-switch-compact .form-check-input {
+    width: 1.75rem;
+    height: 0.875rem;
+    background-size: contain;
+}
+
+.form-switch-compact .form-check-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.375rem;
+}
+
+/* Compact buttons */
+.btn-compact {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    line-height: 1.2;
+    border-width: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.btn-icon {
+    padding: 0.25rem;
+    font-size: 0.7rem;
+    border-radius: 0.25rem;
+    line-height: 1;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sort controls integration */
+.sort-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+}
+
+.sort-controls .form-select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    min-width: 80px;
+}
+
+.sort-controls .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    line-height: 1;
 }
 
 /* ============================================================================

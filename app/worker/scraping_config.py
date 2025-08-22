@@ -3,32 +3,33 @@ from langchain_core.prompts import SystemMessagePromptTemplate
 # Template for event extraction system message
 EVENT_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
-You will be given a markdown-converted webpage by the user.
-If the webpage contains information about upcoming events that are relevant to the following topic, you need to extract that information.
+You will be given a markdown-converted webpage by the user that should contain a news article, a blog post, a press release, or a similar piece of substantive content. Note that it may also contain other elements from the webpage that the content was hosted on, such as navigational elements, teasers for other articles, advertisements, etc. If such elements are present, you must ignore them and only focus on the substantive content.
+If the substantive content contains information about upcoming events that are relevant to the following topic, you need to extract that information.
 Topic name: {topic_name}
 Topic description: {topic_description}
 Topic country: {topic_country}
-Notice that today's date is {current_date}.
-You should only extract information about events that will **take place in the future** and are **relevant to the topic**.
+When determining the date of an upcoming event, keep in mind that today's date is {current_date}, and that the substantive content you are looking at was published on {publish_date}.
 All extracted information should be in the following language: {language}.
-Notice that the point of this task is to create a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
-Therefore, you should only extract events which are specific enough to be used as actionable items in a forward planner.
-Examples of events that are specific enough:
-- The German parliament plans to vote on a new law about combatting hate speech on the 20th of August 2025. (date specific, event specific, actionable)
-- The next hearing in the criminal case against the former president of the United States will take place on the 10th of July 2025, at 10:00 AM. (date and time specific, event specific, actionable)
-Examples of events that are NOT specific enough:
+Notice that the point of this task is to help in creating a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
+Therefore, you should only extract information about events that 1. lie in the future, 2. are specific enough to server as actionable items in a forward planner, and 3. are important enough to be newsworthy.
+Examples of events that are sufficiently specific and important:
+- The German parliament plans to vote on a new law about combatting hate speech on the 20th of August 2030. (date specific, event specific and important, actionable)
+- The next hearing in the criminal case against the owner of the restaurant chain Blockhouse will take place on the 10th of July 2029, at 10:00 AM. (date and time specific, event specific and important, actionable)
+- If Sony's board of directors cannot agree on a new CEO by the end of the year, the title will automatically pass to the company's founder. (date specific, event specific and important, actionable)
+Examples of events that are NOT sufficiently specific or important:
 - The German government plans to install a comittee for reviewing recent changes to the criminal code by the end of the year (date not specific, event somewhat vague, not actionable)
-- Some pundits suspect that the French president will issue his resignation at his annual address on the 1st of January 2026. (date specific, event specific, but mere suspicion that event might happen is not sufficient)
-- The new law is expected to cause rents to go up once it takes effect on the 1st of January 2026. (starting date specific, but this is a broader, long-term development, not a specific event)
+- Some pundits suspect that the French president will issue his resignation at his annual address on the 1st of January next year. (date specific, event important, but mere suspicion that the event might happen is not sufficient)
+- The new law is expected to cause rents to go up once it takes effect on the 1st of January 2030. (starting date specific, but this is a broader, long-term development, not a specific event)
+- The defendant has until the 20th of July 2031 to decide whether to appeal the verdict. (date specific, but this is merely a deadline, not an actual event)
+- KPMG is hosting a seminar on best practices in accouting for students and young professionals (date specific, event specific, but not important / newsworthy)
 """
 )
 
 # Template for source extraction system message
 SOURCE_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
-You will be given a markdown-converted webpage by the user.
-If the webpage contains links to other webpages that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
-Notice that the website may contain footers, headers, sidebars or other non-content elements. You should ignore those and only extract links that seem to target substantive content, e.g. news articles, press releases, blog posts, etc.
+You will be given a markdown-converted webpage by the user that should contain a news article, a blog post, a press release, or a similar piece of substantive content. Note that it may also contain other elements from the webpage that the content was hosted on, such as navigational elements, links and teasers for other articles, advertisements, etc. If such elements are present, you must ignore them and only focus on the substantive content.
+If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
 Topic name: {topic_name}
 Topic description: {topic_description}
 Topic country: {topic_country}

@@ -53,13 +53,14 @@ class LlmService:
             strict=True,
         )
 
-    async def get_event_extraction_system_message(self, topic: TopicBase, language: str) -> str:
+    async def get_event_extraction_system_message(self, topic: TopicBase, language: str, publish_date: datetime.datetime) -> str:
         """Format the event extraction system message."""
         return await EVENT_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
             topic_country=topic.country,
             current_date=datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d. of %B %Y"),
+            publish_date=publish_date.strftime("%A, %d. of %B %Y"),
             language=language,
         )
 

@@ -53,18 +53,22 @@
                 const resp = await fetch(`${apiBase}/topics/?limit=100`, { headers: authHeaders() });
                 if (!resp.ok) throw new Error('Failed to load topics');
                 const topics = await resp.json();
-                // Fetch sources and initial upcoming events for each topic in parallel
-                const [sourcesPairs, eventsPairs] = await Promise.all([
+                // Fetch sources, initial upcoming events, and event counts for each topic in parallel
+                const [sourcesPairs, eventsPairs, countPairs] = await Promise.all([
                     Promise.all(topics.map(async (t) => {
                         try { return [t.id, await fetchSources(t.id)]; } catch { return [t.id, []]; }
                     })),
                     Promise.all(topics.map(async (t) => {
                         try { return [t.id, await fetchUpcomingEvents(t.id, 20, true, 0)]; } catch { return [t.id, []]; }
                     })),
+                    Promise.all(topics.map(async (t) => {
+                        try { return [t.id, await fetchEventsCount(t.id)]; } catch { return [t.id, 0]; }
+                    })),
                 ]);
                 const sourcesByTopic = Object.fromEntries(sourcesPairs);
                 const eventsByTopic = Object.fromEntries(eventsPairs);
-                renderTopics(topics, sourcesByTopic, eventsByTopic);
+                const countsByTopic = Object.fromEntries(countPairs);
+                renderTopics(topics, sourcesByTopic, eventsByTopic, countsByTopic);
                 startPolling(topics.map(t => t.id));
                 // Initialize global collapse switch state
                 setTimeout(updateCollapseAllSwitch, 100);
@@ -92,7 +96,31 @@
             return await resp.json();
         }
 
+        async function fetchEventsCount(topicId) {
+            const params = new URLSearchParams({
+                topic_id: String(topicId),
+                limit: '1000', // High limit to get all events for counting
+                skip: '0',
+            });
+            const resp = await fetch(`${apiBase}/events/?${params.toString()}`, { headers: authHeaders() });
+            if (!resp.ok) throw new Error('Failed to load events count');
+            const events = await resp.json();
+            return events.length;
+        }
+
         const topicState = {};
+
+        // Helper function to extract domain from URL
+        function extractDomain(url) {
+            try {
+                const domain = new URL(url).hostname;
+                // Remove 'www.' prefix and capitalize first letter
+                const cleanDomain = domain.replace(/^www\./, '');
+                return cleanDomain.charAt(0).toUpperCase() + cleanDomain.slice(1);
+            } catch (e) {
+                return 'Unknown';
+            }
+        }
 
         // Sort state: default to date ascending
         const sortState = {
@@ -122,7 +150,7 @@
             return sortedEvents;
         }
 
-        function renderTopics(topics, sourcesByTopic, eventsByTopic) {
+        function renderTopics(topics, sourcesByTopic, eventsByTopic, countsByTopic) {
             const container = document.getElementById('topics');
             container.innerHTML = '';
             if (!topics.length) {
@@ -142,14 +170,19 @@
                     <div class="text-secondary small">${t.description || ''}</div>
                   </div>
                 </div>
-                <div class="ms-3 flex-shrink-0 d-flex align-items-start gap-3">
-                  <div class="form-check form-switch mt-1">
-                    <input class="form-check-input" type="checkbox" id="topic-expand-${t.id}" checked>
-                    <label class="form-check-label small" for="topic-expand-${t.id}">Expand topic</label>
-                  </div>
-                  <div class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-secondary" href="/app/topic-edit.html?id=${t.id}">✏️ Edit</a>
-                    <a class="btn btn-sm btn-primary" href="/app/source-new.html?topic_id=${t.id}">➕ Add Feed</a>
+                <div class="ms-3 flex-shrink-0">
+                  <div class="control-panel-compact">
+                    <div class="control-group">
+                      <div class="form-check form-switch form-switch-compact">
+                        <input class="form-check-input" type="checkbox" id="topic-expand-${t.id}" checked>
+                        <label class="form-check-label" for="topic-expand-${t.id}">Expand</label>
+                      </div>
+                    </div>
+                    <div class="control-group-divider"></div>
+                    <div class="control-group">
+                      <a class="btn btn-compact btn-outline-secondary" href="/app/topic-edit.html?id=${t.id}">✏️</a>
+                      <a class="btn btn-compact btn-primary" href="/app/source-new.html?topic_id=${t.id}">➕</a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -160,38 +193,55 @@
                     <div class="icon-placeholder icon-topic me-2">📡</div>
                     <span>Feeds <span class="text-muted" id="feeds-count-${t.id}"></span></span>
                   </h3>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="sources-expand-${t.id}" checked>
-                    <label class="form-check-label small" for="sources-expand-${t.id}">Expand feeds</label>
+                  <div class="control-group">
+                    <div class="form-check form-switch form-switch-compact">
+                      <input class="form-check-input" type="checkbox" id="sources-expand-${t.id}" checked>
+                      <label class="form-check-label" for="sources-expand-${t.id}">Expand</label>
+                    </div>
                   </div>
                 </div>
                 <div class="collapse show" id="sources-content-${t.id}">
                   <div id="sources-${t.id}"></div>
                 </div>
                 <hr class="my-4" />
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h3 class="h6 mb-0 d-flex align-items-center">
-                    <div class="icon-placeholder icon-event me-2">📅</div>
-                    <span>Upcoming events <span class="text-muted" id="events-count-${t.id}"></span></span>
-                  </h3>
-                  <div class="d-flex align-items-center gap-3">
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="events-expand-${t.id}" checked>
-                      <label class="form-check-label small" for="events-expand-${t.id}">Expand events</label>
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h6 mb-0 d-flex align-items-center">
+                      <div class="icon-placeholder icon-event me-2">📅</div>
+                      <span>Upcoming events <span class="text-muted" id="events-count-${t.id}"></span></span>
+                    </h3>
+                  </div>
+                  <div class="control-panel-compact">
+                    <div class="control-group">
+                      <div class="form-check form-switch form-switch-compact">
+                        <input class="form-check-input" type="checkbox" id="events-expand-${t.id}" checked>
+                        <label class="form-check-label" for="events-expand-${t.id}">Expand</label>
+                      </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="small text-muted">Sort:</span>
-                      <select class="form-select form-select-sm event-sort-field" id="sort-field-${t.id}" style="width: auto;">
+                    <div class="control-group-divider"></div>
+                    <div class="control-group">
+                      <div class="form-check form-switch form-switch-compact">
+                        <input class="form-check-input" type="checkbox" id="minimal-view-${t.id}">
+                        <label class="form-check-label" for="minimal-view-${t.id}">Minimal</label>
+                      </div>
+                    </div>
+                    <div class="control-group-divider"></div>
+                    <div class="control-group sort-controls">
+                      <span class="text-muted">Sort:</span>
+                      <select class="form-select event-sort-field" id="sort-field-${t.id}">
                         <option value="date">Date</option>
                         <option value="significance">Significance</option>
                       </select>
-                      <button class="btn btn-outline-secondary btn-sm event-sort-direction" id="sort-direction-${t.id}" title="Toggle sort direction">
+                      <button class="btn btn-outline-secondary event-sort-direction" id="sort-direction-${t.id}" title="Toggle sort direction">
                         <span class="sort-text">Ascending</span>
                       </button>
                     </div>
-                    <div class="form-check form-switch">
-                      <input class="form-check-input" type="checkbox" id="toggle-all-sources-${t.id}">
-                      <label class="form-check-label small" for="toggle-all-sources-${t.id}">Show all sources</label>
+                    <div class="control-group-divider"></div>
+                    <div class="control-group">
+                      <div class="form-check form-switch form-switch-compact">
+                        <input class="form-check-input" type="checkbox" id="toggle-all-sources-${t.id}">
+                        <label class="form-check-label" for="toggle-all-sources-${t.id}">All sources</label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -243,8 +293,9 @@
                 feedsCountEl.textContent = sources.length > 0 ? `(${sources.length})` : '';
 
                 // Initialize topic state
-                topicState[t.id] = topicState[t.id] || { limit: 20, skip: 0, showSourcesGlobal: false, expanded: new Set(), events: [] };
+                topicState[t.id] = topicState[t.id] || { limit: 20, skip: 0, showSourcesGlobal: false, expanded: new Set(), events: [], totalCount: 0, minimalView: false, expandedInMinimal: new Set() };
                 topicState[t.id].events = eventsByTopic[t.id] || [];
+                topicState[t.id].totalCount = countsByTopic[t.id] || 0;
 
                 // Render events
                 renderEventsForTopic(t.id);
@@ -257,13 +308,28 @@
                     renderEventsForTopic(t.id);
                 };
 
+                // Wire minimal view toggle
+                const minimalToggle = card.querySelector(`#minimal-view-${t.id}`);
+                minimalToggle.checked = topicState[t.id].minimalView;
+                minimalToggle.onchange = () => {
+                    topicState[t.id].minimalView = !!minimalToggle.checked;
+                    // Clear individual expansion state when toggling minimal view off or on
+                    // This ensures a clean slate when re-entering minimal view
+                    topicState[t.id].expandedInMinimal.clear();
+                    renderEventsForTopic(t.id);
+                };
+
                 // Wire Show more
                 const showMoreBtn = card.querySelector(`#show-more-${t.id}`);
                 showMoreBtn.onclick = async () => {
                     try {
                         topicState[t.id].limit += 20;
-                        const newEvents = await fetchUpcomingEvents(t.id, 20, true, topicState[t.id].events.length);
+                        const [newEvents, newCount] = await Promise.all([
+                            fetchUpcomingEvents(t.id, 20, true, topicState[t.id].events.length),
+                            fetchEventsCount(t.id)
+                        ]);
                         topicState[t.id].events = topicState[t.id].events.concat(newEvents);
+                        topicState[t.id].totalCount = newCount;
                         renderEventsForTopic(t.id);
                     } catch (e) {
                         console.error(e);
@@ -279,10 +345,10 @@
                 topicSwitch.onchange = () => {
                     if (topicSwitch.checked) {
                         topicContent.classList.add('show');
-                        topicLabel.textContent = 'Expand topic';
+                        topicLabel.textContent = 'Expand';
                     } else {
                         topicContent.classList.remove('show');
-                        topicLabel.textContent = 'Collapse topic';
+                        topicLabel.textContent = 'Collapse';
                     }
                     setTimeout(updateCollapseAllSwitch, 100);
                 };
@@ -295,10 +361,10 @@
                 sourcesSwitch.onchange = () => {
                     if (sourcesSwitch.checked) {
                         sourcesContent.classList.add('show');
-                        sourcesLabel.textContent = 'Expand feeds';
+                        sourcesLabel.textContent = 'Expand';
                     } else {
                         sourcesContent.classList.remove('show');
-                        sourcesLabel.textContent = 'Collapse feeds';
+                        sourcesLabel.textContent = 'Collapse';
                     }
                 };
 
@@ -310,10 +376,10 @@
                 eventsSwitch.onchange = () => {
                     if (eventsSwitch.checked) {
                         eventsContent.classList.add('show');
-                        eventsLabel.textContent = 'Expand events';
+                        eventsLabel.textContent = 'Expand';
                     } else {
                         eventsContent.classList.remove('show');
-                        eventsLabel.textContent = 'Collapse events';
+                        eventsLabel.textContent = 'Collapse';
                     }
                 };
 
@@ -372,9 +438,11 @@
             const events = sortEvents(rawEvents, sortField, sortDirection);
             const eventsContainer = document.createElement('div');
             eventsContainer.className = 'vstack gap-3';
+            const isMinimalView = data.minimalView || false;
             events.forEach(ev => {
                 const evId = ev.id;
                 const expanded = data.expanded.has(evId) || data.showSourcesGlobal;
+                const expandedInMinimal = data.expandedInMinimal.has(evId);
                 const dateStr = new Date(ev.date).toLocaleDateString('en-US', {
                     year: 'numeric', month: 'short', day: 'numeric',
                     hour: '2-digit', minute: '2-digit'
@@ -391,14 +459,17 @@
 
                 const eventDiv = document.createElement('div');
                 eventDiv.className = 'event-item';
-                eventDiv.innerHTML = `
-                    <div class="d-flex align-items-start gap-3">
-                      <div class="icon-placeholder icon-event flex-shrink-0">📅</div>
-                      <div class="flex-grow-1 min-w-0">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                          <div class="flex-grow-1 min-w-0 me-3">
+
+                if (isMinimalView && !expandedInMinimal) {
+                    // Minimal view: only title, date, and location (clickable to expand)
+                    eventDiv.className += ' event-item-minimal-clickable';
+                    eventDiv.style.cursor = 'pointer';
+                    eventDiv.innerHTML = `
+                        <div class="d-flex align-items-center gap-3">
+                          <div class="icon-placeholder icon-event flex-shrink-0">📅</div>
+                          <div class="flex-grow-1 min-w-0">
                             <h4 class="h6 mb-1 fw-semibold">${ev.title}</h4>
-                            <div class="small text-secondary mb-2">
+                            <div class="small text-secondary">
                               <span class="fw-medium">📅 ${dateStr}</span>
                               ${ev.location ? ` • <span class="fw-medium">📍 ${ev.location}</span>` : ''}
                             </div>
@@ -407,42 +478,89 @@
                             <span class="confidence-badge ${confidenceClass}" title="Significance rating for this event, based on the nature of the event, its importance to the topic, and the likelihood of the event coming to pass">${confidence}%</span>
                           </div>
                         </div>
-                        ${ev.description ? `<div class="mb-3 fw-medium text-dark">${ev.description}</div>` : ''}
-                        ${addl ? `<div class="mb-2"><small class="text-muted fw-medium">Additional Info:</small><br/>${addl}</div>` : ''}
-                        <div class="text-end">
-                          <div class="form-check form-switch d-inline-flex align-items-center">
-                            <input class="form-check-input" type="checkbox" id="event-sources-${evId}" ${expanded ? 'checked' : ''}>
-                            <label class="form-check-label small ms-2" for="event-sources-${evId}">${expanded ? 'Hide sources' : 'Show sources'}</label>
+                    `;
+                } else {
+                    // Full view (either not minimal mode or expanded in minimal mode)
+                    if (isMinimalView && expandedInMinimal) {
+                        eventDiv.className += ' event-item-expanded-in-minimal';
+                        eventDiv.style.cursor = 'pointer';
+                    }
+                    eventDiv.innerHTML = `
+                        <div class="d-flex align-items-start gap-3">
+                          <div class="icon-placeholder icon-event flex-shrink-0">📅</div>
+                          <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                              <div class="flex-grow-1 min-w-0 me-3">
+                                <h4 class="h6 mb-1 fw-semibold">${ev.title} ${isMinimalView && expandedInMinimal ? '<small class="text-muted">(click to collapse)</small>' : ''}</h4>
+                                <div class="small text-secondary mb-2">
+                                  <span class="fw-medium">📅 ${dateStr}</span>
+                                  ${ev.location ? ` • <span class="fw-medium">📍 ${ev.location}</span>` : ''}
+                                </div>
+                              </div>
+                              <div class="flex-shrink-0">
+                                <span class="confidence-badge ${confidenceClass}" title="Significance rating for this event, based on the nature of the event, its importance to the topic, and the likelihood of the event coming to pass">${confidence}%</span>
+                              </div>
+                            </div>
+                            ${ev.description ? `<div class="mb-3 fw-medium text-dark text-overflow-container">${ev.description}</div>` : ''}
+                            ${addl ? `<div class="mb-2 text-overflow-container"><small class="text-muted fw-medium">Additional Info:</small><br/><div class="badge-container">${addl}</div></div>` : ''}
+                            ${!isMinimalView ? `<div class="text-end">
+                              <div class="form-check form-switch form-switch-compact d-inline-flex align-items-center">
+                                <input class="form-check-input" type="checkbox" id="event-sources-${evId}" ${expanded ? 'checked' : ''}>
+                                <label class="form-check-label ms-2" for="event-sources-${evId}">${expanded ? 'Hide sources for this event' : 'Show sources for this event'}</label>
+                              </div>
+                            </div>` : ''}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                    <div class="mt-3 ${expanded ? '' : 'd-none'}" id="ev-sources-${evId}"></div>
-                `;
+                        ${!isMinimalView ? `<div class="mt-3 ${expanded ? '' : 'd-none'}" id="ev-sources-${evId}"></div>` : ''}
+                    `;
+                }
                 eventsContainer.appendChild(eventDiv);
-                // Render extracted events list
-                const tgt = eventDiv.querySelector(`#ev-sources-${evId}`);
-                renderExtractedEvents(tgt, ev.extracted_events || []);
-                // Wire per-event toggle
-                const sourceSwitch = eventDiv.querySelector(`#event-sources-${evId}`);
-                const sourceLabel = eventDiv.querySelector(`label[for="event-sources-${evId}"]`);
-                sourceSwitch.onchange = () => {
-                    if (sourceSwitch.checked) {
-                        data.expanded.add(evId);
-                        sourceLabel.textContent = 'Show sources';
-                    } else {
-                        data.expanded.delete(evId);
-                        sourceLabel.textContent = 'Hide sources';
+
+                // Add click handlers for minimal view expansion/collapse
+                if (isMinimalView) {
+                    eventDiv.onclick = () => {
+                        if (expandedInMinimal) {
+                            // Collapse this event
+                            data.expandedInMinimal.delete(evId);
+                        } else {
+                            // Expand this event
+                            data.expandedInMinimal.add(evId);
+                        }
+                        renderEventsForTopic(topicId);
+                    };
+                }
+
+                // Only add source toggle functionality if not in minimal view
+                if (!isMinimalView) {
+                    // Render extracted events list
+                    const tgt = eventDiv.querySelector(`#ev-sources-${evId}`);
+                    if (tgt) {
+                        renderExtractedEvents(tgt, ev.extracted_events || []);
                     }
-                    renderEventsForTopic(topicId);
-                };
+                    // Wire per-event toggle
+                    const sourceSwitch = eventDiv.querySelector(`#event-sources-${evId}`);
+                    const sourceLabel = eventDiv.querySelector(`label[for="event-sources-${evId}"]`);
+                    if (sourceSwitch && sourceLabel) {
+                        sourceSwitch.onchange = () => {
+                            if (sourceSwitch.checked) {
+                                data.expanded.add(evId);
+                                sourceLabel.textContent = 'Hide';
+                            } else {
+                                data.expanded.delete(evId);
+                                sourceLabel.textContent = 'Show';
+                            }
+                            renderEventsForTopic(topicId);
+                        };
+                    }
+                }
             });
             container.innerHTML = '';
             container.appendChild(eventsContainer);
 
-            // Update events count
+            // Update events count - use total count, not just displayed events
             const eventsCountEl = document.querySelector(`#events-count-${topicId}`);
-            eventsCountEl.textContent = events.length > 0 ? `(${events.length})` : '';
+            const totalCount = data.totalCount || 0;
+            eventsCountEl.textContent = totalCount > 0 ? `(${totalCount})` : '';
         }
 
         function renderExtractedEvents(container, extracted) {
@@ -460,6 +578,8 @@
                 const addl = x.additional_infos && Object.entries(x.additional_infos).length
                     ? Object.entries(x.additional_infos).map(([k, v]) => `<span class=\"badge text-bg-light me-1 mb-1\">"${k}: ${v}"</span>`).join(' ')
                     : '';
+                const domain = extractDomain(x.source_url);
+                const displayTitle = x.source_title ? `${domain}: ${x.source_title}` : `${domain}: Article`;
                 const sourceItem = document.createElement('div');
                 sourceItem.className = 'source-item';
                 sourceItem.innerHTML = `
@@ -468,13 +588,13 @@
                       <div class="flex-grow-1">
                         <div class="fw-semibold small">
                           <a href="${x.source_url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
-                            ${x.source_title || 'Article'}
+                            ${displayTitle}
                           </a>
                         </div>
                         <div class="small text-secondary">
                           📅 Published ${dateStr} • 🔗 hops: ${x.degrees_of_separation}
                         </div>
-                        ${addl ? `<div class="mt-1">${addl}</div>` : ''}
+                        ${addl ? `<div class="mt-1 text-overflow-container"><div class="badge-container">${addl}</div></div>` : ''}
                       </div>
                     </div>
                 `;
@@ -485,22 +605,28 @@
         }
 
         function startPolling(topicIds) {
+            console.log('Starting polling with 5 minute intervals (300000ms)');
             setInterval(async () => {
+                console.log('Polling for updates...', new Date().toLocaleTimeString());
                 try {
                     const pairs = await Promise.all(topicIds.map(async (tid) => {
                         const limit = topicState[tid]?.events?.length || 20;
-                        const events = await fetchUpcomingEvents(tid, limit, true, 0);
-                        return [tid, events];
+                        const [events, count] = await Promise.all([
+                            fetchUpcomingEvents(tid, limit, true, 0),
+                            fetchEventsCount(tid)
+                        ]);
+                        return [tid, events, count];
                     }));
-                    for (const [tid, events] of pairs) {
+                    for (const [tid, events, count] of pairs) {
                         if (!topicState[tid]) continue;
                         topicState[tid].events = events;
+                        topicState[tid].totalCount = count;
                         renderEventsForTopic(tid);
                     }
                 } catch (e) {
                     console.error('Polling failed', e);
                 }
-            }, 30000);
+            }, 300000);
         }
 
         // Global collapse/expand functionality
@@ -546,17 +672,17 @@
                 document.querySelectorAll('[id^="topic-expand-"]').forEach(switchEl => {
                     switchEl.checked = true;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Expand topic';
+                    if (label) label.textContent = 'Expand';
                 });
                 document.querySelectorAll('[id^="sources-expand-"]').forEach(switchEl => {
                     switchEl.checked = true;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Expand feeds';
+                    if (label) label.textContent = 'Expand';
                 });
                 document.querySelectorAll('[id^="events-expand-"]').forEach(switchEl => {
                     switchEl.checked = true;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Expand events';
+                    if (label) label.textContent = 'Expand';
                 });
             } else {
                 // Collapse all
@@ -574,17 +700,17 @@
                 document.querySelectorAll('[id^="topic-expand-"]').forEach(switchEl => {
                     switchEl.checked = false;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Collapse topic';
+                    if (label) label.textContent = 'Collapse';
                 });
                 document.querySelectorAll('[id^="sources-expand-"]').forEach(switchEl => {
                     switchEl.checked = false;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Collapse feeds';
+                    if (label) label.textContent = 'Collapse';
                 });
                 document.querySelectorAll('[id^="events-expand-"]').forEach(switchEl => {
                     switchEl.checked = false;
                     const label = document.querySelector(`label[for="${switchEl.id}"]`);
-                    if (label) label.textContent = 'Collapse events';
+                    if (label) label.textContent = 'Collapse';
                 });
             }
         };
