@@ -55,7 +55,6 @@ class EventResponse(EventBase):
     location_from_id: int | None = None
     duration_from_id: int | None = None
     confidence_score: float
-    semantic_vector: List[float] | None = None
     created_at: datetime
     update_history: List[datetime]
     topic_id: int

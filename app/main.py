@@ -1,19 +1,14 @@
-import logging
 from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from rich.traceback import install
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.custom_logging import create_logger
 from app.worker.scheduler import scheduler
-
-if settings.DEBUG:
-    install(show_locals=True)
-
-logging.getLogger("asyncio").setLevel(logging.ERROR)
 
 
 @asynccontextmanager
@@ -31,6 +26,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Initialize loguru logging once for entire project
+create_logger()
+
+
 # Set up CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -42,6 +41,9 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Mount static frontend at /app
+app.mount("/app", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 @app.get("/")
@@ -57,70 +59,61 @@ async def root():
 
 @app.get("/debug")
 async def dbg():
-    print("debug entry hit")
+    source_id = 15
 
-    # List scheduler jobs
-    from datetime import timezone
+    # Clear test data before running scraper
+    # from sqlalchemy import delete, select
+    # from app.database import get_db_session
+    # from app.models import EventComparisonDB, EventDB, ExtractedEventDB, ScrapingSourceDB
+    # import datetime
+    # async with get_db_session() as db:
+    #     await db.execute(delete(EventComparisonDB))
+    #     await db.execute(delete(EventDB))
+    #     await db.execute(delete(ExtractedEventDB))
+    # sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()
+    # for source in sources:
+    #     source.last_scraped_at = datetime.now(timezone.utc) - timedelta(days=1)
+    # db.add(source)
+    #     await db.commit()
+    #     print("Cleared all EventDB, ExtractedEventDB, and EventComparisonDB records, and set last_scraped_at 1 days back")
 
+    # Run scraper
+    # from app.worker.scraper import Scraper
+    # scraper = Scraper(source_id)
+    # await scraper.scrape()
+
+    # Reschedule jobs
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import select
+
+    from app.database import get_db_session
+    from app.models import ScrapingSourceDB
     from app.worker.scheduler import scheduler
 
-    job_infos = []
-    for job in scheduler.get_jobs():  # or scheduler.get_jobs(jobstore="scraping")
-        job_info = {
-            "id": job.id,
-            "name": job.name,
-            "func": f"{job.func.__module__}.{job.func.__name__}",
-            "args": job.args,
-            "trigger": str(job.trigger),
-            "next_run_time": job.next_run_time.astimezone(timezone.utc).isoformat() if job.next_run_time else None,
-            "misfire_grace_time": job.misfire_grace_time,
-            "coalesce": job.coalesce,
-            "max_instances": job.max_instances,
-            "executor": job.executor,
-        }
-        job_infos.append(job_info)
-        print(job_info)
+    async with get_db_session() as db:
+        sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()
+        for source in sources:
+            source.last_scraped_at = datetime.now(timezone.utc) - timedelta(days=3)
+            db.add(source)
+            print(f"Set last_scraped_at for source {source.id} to {source.last_scraped_at}")
+        await db.commit()
 
-    return {"jobs": job_infos}
+    from app.worker.scraper import Scraper
+    scraper = Scraper(source_id)
+    await scraper.scrape()
+
+    # for i, job in enumerate(scheduler.get_jobs()):
+    #     scheduler.modify_job(job.id, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20 * i))
+    #     print(f"Rescheduled job {i}: {job.id} to {datetime.now(timezone.utc) + timedelta(seconds=20 * i)}")
 
 
-@app.get("/debug/reschedule/{job_id}/{minutes}")
-async def reschedule_job(job_id: str, minutes: int):
-    """Manually reschedule a job to run in X minutes from now"""
-    from datetime import datetime, timedelta
-
-    from app.worker.scheduler import scheduler
-
-    try:
-        # Calculate the target time
-        next_run_time = datetime.now() + timedelta(minutes=minutes)
-
-        # Get the job
-        job = scheduler.get_job(job_id, jobstore="scraping")
-
-        if not job:
-            return {"error": f"Job '{job_id}' not found!", "success": False}
-
-        old_next_run = job.next_run_time
-
-        # Modify the job's next run time
-        scheduler.modify_job(job_id=job_id, jobstore="scraping", next_run_time=next_run_time)
-
-        # Verify the change
-        updated_job = scheduler.get_job(job_id, jobstore="scraping")
-
-        return {
-            "success": True,
-            "job_id": job_id,
-            "old_next_run_time": old_next_run.isoformat() if old_next_run else None,
-            "new_next_run_time": updated_job.next_run_time.isoformat() if updated_job.next_run_time else None,
-            "minutes_from_now": minutes,
-            "message": f"Job '{job_id}' will run in {minutes} minutes",
-        }
-
-    except Exception as e:
-        return {"error": str(e), "success": False}
-
-
-# Mount static frontend at /app
-app.mount("/app", StaticFiles(directory="frontend", html=True), name="frontend")
+if __name__ == "__main__":
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        reload=False,
+        log_level=None,
+        log_config=None,
+        port=8000,
+    )

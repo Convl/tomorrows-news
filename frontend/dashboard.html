@@ -323,9 +323,9 @@
                 const showMoreBtn = card.querySelector(`#show-more-${t.id}`);
                 showMoreBtn.onclick = async () => {
                     try {
-                        topicState[t.id].limit += 20;
+                        const currentSkip = topicState[t.id].events.length + 1;
                         const [newEvents, newCount] = await Promise.all([
-                            fetchUpcomingEvents(t.id, 20, true, topicState[t.id].events.length),
+                            fetchUpcomingEvents(t.id, 20, true, currentSkip),
                             fetchEventsCount(t.id)
                         ]);
                         topicState[t.id].events = topicState[t.id].events.concat(newEvents);
@@ -485,6 +485,7 @@
                         eventDiv.className += ' event-item-expanded-in-minimal';
                         eventDiv.style.cursor = 'pointer';
                     }
+                    // TODO: remove false && to re-activate additional infos
                     eventDiv.innerHTML = `
                         <div class="d-flex align-items-start gap-3">
                           <div class="icon-placeholder icon-event flex-shrink-0">📅</div>
@@ -502,16 +503,16 @@
                               </div>
                             </div>
                             ${ev.description ? `<div class="mb-3 fw-medium text-dark text-overflow-container">${ev.description}</div>` : ''}
-                            ${addl ? `<div class="mb-2 text-overflow-container"><small class="text-muted fw-medium">Additional Info:</small><br/><div class="badge-container">${addl}</div></div>` : ''}
-                            ${!isMinimalView ? `<div class="text-end">
+                            ${false && addl ? `<div class="mb-2 text-overflow-container"><small class="text-muted fw-medium">Additional Info:</small><br/><div class="badge-container">${addl}</div></div>` : ''}
+                            ${(!isMinimalView || (isMinimalView && expandedInMinimal)) ? `<div class="text-end">
                               <div class="form-check form-switch form-switch-compact d-inline-flex align-items-center">
                                 <input class="form-check-input" type="checkbox" id="event-sources-${evId}" ${expanded ? 'checked' : ''}>
-                                <label class="form-check-label ms-2" for="event-sources-${evId}">${expanded ? 'Hide sources for this event' : 'Show sources for this event'}</label>
+                                <label class="form-check-label ms-2" for="event-sources-${evId}">Show sources for this event</label>
                               </div>
                             </div>` : ''}
                           </div>
                         </div>
-                        ${!isMinimalView ? `<div class="mt-3 ${expanded ? '' : 'd-none'}" id="ev-sources-${evId}"></div>` : ''}
+                        ${(!isMinimalView || (isMinimalView && expandedInMinimal)) ? `<div class="mt-3 ${expanded ? '' : 'd-none'}" id="ev-sources-${evId}"></div>` : ''}
                     `;
                 }
                 eventsContainer.appendChild(eventDiv);
@@ -530,8 +531,8 @@
                     };
                 }
 
-                // Only add source toggle functionality if not in minimal view
-                if (!isMinimalView) {
+                // Add source toggle functionality if not in minimal view OR if expanded in minimal view
+                if (!isMinimalView || (isMinimalView && expandedInMinimal)) {
                     // Render extracted events list
                     const tgt = eventDiv.querySelector(`#ev-sources-${evId}`);
                     if (tgt) {
@@ -541,16 +542,22 @@
                     const sourceSwitch = eventDiv.querySelector(`#event-sources-${evId}`);
                     const sourceLabel = eventDiv.querySelector(`label[for="event-sources-${evId}"]`);
                     if (sourceSwitch && sourceLabel) {
-                        sourceSwitch.onchange = () => {
+                        sourceSwitch.onchange = (e) => {
+                            e.stopPropagation(); // Prevent event bubbling to parent div
                             if (sourceSwitch.checked) {
                                 data.expanded.add(evId);
-                                sourceLabel.textContent = 'Hide';
+                                sourceLabel.textContent = 'Hide sources for this event';
                             } else {
                                 data.expanded.delete(evId);
-                                sourceLabel.textContent = 'Show';
+                                sourceLabel.textContent = 'Show sources for this event';
                             }
                             renderEventsForTopic(topicId);
                         };
+                        // Also prevent clicks on the toggle container from bubbling
+                        const toggleContainer = sourceSwitch.closest('.form-check');
+                        if (toggleContainer) {
+                            toggleContainer.onclick = (e) => e.stopPropagation();
+                        }
                     }
                 }
             });
@@ -580,21 +587,26 @@
                     : '';
                 const domain = extractDomain(x.source_url);
                 const displayTitle = x.source_title ? `${domain}: ${x.source_title}` : `${domain}: Article`;
+                const linkUrl = x.snippet ? `${x.source_url}#:~:text=${encodeURIComponent(x.snippet)}` : x.source_url;
                 const sourceItem = document.createElement('div');
                 sourceItem.className = 'source-item';
+                // TODO: remove false && to re-activate additional infos
                 sourceItem.innerHTML = `
                     <div class="d-flex align-items-start">
                       <div class="icon-placeholder icon-web me-2">🔗</div>
                       <div class="flex-grow-1">
                         <div class="fw-semibold small">
-                          <a href="${x.source_url}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                          <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
                             ${displayTitle}
                           </a>
                         </div>
                         <div class="small text-secondary">
                           📅 Published ${dateStr} • 🔗 hops: ${x.degrees_of_separation}
                         </div>
-                        ${addl ? `<div class="mt-1 text-overflow-container"><div class="badge-container">${addl}</div></div>` : ''}
+                        ${x.snippet ? `<div class="mt-1 small text-muted">
+                          <i>"${x.snippet}"</i>
+                        </div>` : ''}
+                        ${false && addl ? `<div class="mt-1 text-overflow-container"><div class="badge-container">${addl}</div></div>` : ''}
                       </div>
                     </div>
                 `;

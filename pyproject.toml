@@ -45,5 +45,7 @@ line-ending = "auto"
 [dependency-groups]
 dev = [
     "ipython>=9.4.0",
+    "loguru>=0.7.3",
+    "pyright>=1.1.404",
     "rich>=14.0.0",
 ]

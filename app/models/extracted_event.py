@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.models.event import EventDB
     from app.models.scraping_source import ScrapingSourceDB
     from app.models.topic import TopicDB
-    from app.worker.scraping_models import ExtractedEvent
+    from app.worker.scraping_models import ExtractedEvent, ScrapingSourceWorkflow
 
 
 class ExtractedEventDB(Base):
@@ -27,6 +27,7 @@ class ExtractedEventDB(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    snippet: Mapped[str] = mapped_column(String(500), nullable=False)
     location: Mapped[str | None] = mapped_column(String(300), nullable=True)
     significance: Mapped[float] = mapped_column(Float, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column(Interval, nullable=True)
@@ -55,14 +56,14 @@ class ExtractedEventDB(Base):
     topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="extracted_events", lazy="raise")
 
     # The consolidated event, create from this ExtractedEvent and others
-    event_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("events.id"), nullable=True)
+    event_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=True)
     event: Mapped["EventDB"] = relationship(
         "EventDB", back_populates="extracted_events", foreign_keys=[event_id], lazy="raise"
     )
 
     @classmethod
     def from_extracted_event(
-        cls, extracted_event: "ExtractedEvent", scraping_source: "ScrapingSourceDB", event_id: int | None = None
+        cls, extracted_event: "ExtractedEvent", scraping_source: "ScrapingSourceWorkflow", event_id: int | None = None
     ) -> "ExtractedEventDB":
         """Convert Pydantic ExtractedEvent to SQLAlchemy ExtractedEventDB."""
 
@@ -84,9 +85,9 @@ class ExtractedEventDB(Base):
             event_country_timezone = pytz.timezone(event_countries_list[0])
         except Exception:
             # if that fails, try getting timezone from country as inferred by ScrapingSource
-            if scraping_source.country:
+            if scraping_source.country_code:
                 try:
-                    event_countries_list = pytz.country_timezones[scraping_source.country.upper()]
+                    event_countries_list = pytz.country_timezones[scraping_source.country_code.upper()]
                     event_country_timezone = pytz.timezone(event_countries_list[0])
                 except Exception:
                     pass
@@ -99,12 +100,7 @@ class ExtractedEventDB(Base):
 
         # Localize source published date to UTC
         source_published_date = source_data["date"]
-        if source_published_date.tzinfo is None:
-            # Assume naive dates are UTC
-            source_published_date = source_published_date.replace(tzinfo=timezone.utc)
-        else:
-            # Convert to UTC
-            source_published_date = source_published_date.astimezone(timezone.utc)
+        source_published_date = cls.convert_date_to_utc(source_published_date)
 
         return cls(
             **event_data,
@@ -114,6 +110,16 @@ class ExtractedEventDB(Base):
             source_published_date=source_published_date,
             degrees_of_separation=source_data["degrees_of_separation"],
             scraping_source_id=scraping_source.id,
-            topic_id=scraping_source.topic_id,
+            topic_id=scraping_source.topic.id,
             event_id=event_id,
         )
+    
+    @staticmethod
+    def convert_date_to_utc(source_date: datetime) -> datetime:
+        if source_date.tzinfo is None:
+            # Assume naive dates are UTC
+            source_date = source_date.replace(tzinfo=timezone.utc)
+        else:
+            # Convert to UTC
+            source_date = source_date.astimezone(timezone.utc)
+        return source_date

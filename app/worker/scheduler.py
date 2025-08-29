@@ -24,7 +24,7 @@ executors = {"scraping": AsyncIOExecutor()}
 
 job_defaults = {
     "coalesce": True,  # Combine multiple missed executions into one
-    "misfire_grace_time": 300,  # Allow jobs to be 5 minutes late before considering them missed
+    "misfire_grace_time": 691200,  # Allow jobs to be executed up to 8 days late
 }
 
 scheduler = AsyncIOScheduler(jobstores=jobstore, executors=executors, job_defaults=job_defaults)

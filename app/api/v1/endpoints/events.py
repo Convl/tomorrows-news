@@ -158,7 +158,6 @@ async def list_events(
                     location_from_id=e.location_from_id,
                     duration_from_id=e.duration_from_id,
                     confidence_score=e.confidence_score,
-                    semantic_vector=e.semantic_vector,
                     created_at=e.created_at,
                     update_history=e.update_history,
                     topic_id=e.topic_id,

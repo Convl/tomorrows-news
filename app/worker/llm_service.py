@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.schemas.topic import TopicBase
 
 from .scraping_config import EVENT_EXTRACTION_SYSTEM_TEMPLATE, SOURCE_EXTRACTION_SYSTEM_TEMPLATE
-from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedUrls, ExtractedWebSources
+from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedWebSources
 
 
 class LlmService:

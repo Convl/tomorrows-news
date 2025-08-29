@@ -1,5 +1,7 @@
+import asyncio
+import datetime
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from pprint import pprint
 
 from langchain_core.messages import HumanMessage
@@ -7,6 +9,7 @@ from langchain_openai import OpenAIEmbeddings
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
+from loguru import logger
 from pgvector.sqlalchemy import Vector
 from psycopg.errors import QueryCanceled
 from psycopg.rows import dict_row
@@ -51,13 +54,14 @@ class Scraper:
     def __init__(self, source_id):
         self.sources = []
         self.scraping_source_id = source_id
+        self.logger = logger.bind(source_id=source_id)
 
     async def calculate_evidence_score(self, evidence_list: list[ExtractedEventDB]) -> float:
         """Calculate weighted score for a list of evidence based on recency."""
         if not evidence_list:
             return 0.0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.datetime.now(timezone.utc)
         score = 0.0
 
         for evidence in evidence_list:
@@ -196,7 +200,7 @@ class Scraper:
         )
 
     async def merge_with_llm_if_same_event(
-        self, extracted_event_db: ExtractedEventDB, event_db: EventDB, db: AsyncSession
+        self, extracted_event_db: ExtractedEventDB, event_db: EventDB
     ) -> EventMergeResponse:
         """
         Check if two events represent the same real-world event and merge their titles and descriptions if they do.
@@ -270,8 +274,8 @@ class Scraper:
     async def commit_extracted_events_to_db(self, state: ScrapingState):
         """Commit ExtractedEvents to the database, then call consolidate_extracted_events."""
         extracted_events_db = []
-        async with get_db_session() as db:
-            for extracted_event in state.events:
+        for extracted_event in state.events:
+            async with get_db_session() as db:
                 extracted_event_db = ExtractedEventDB.from_extracted_event(extracted_event, state.scraping_source)
                 db.add(extracted_event_db)
                 await db.flush()
@@ -284,64 +288,84 @@ class Scraper:
                 db.add(extracted_event_db)
                 extracted_events_db.append(extracted_event_db)
                 await db.flush()
-            await db.commit()
-            await self.consolidate_extracted_events(extracted_events_db, db)
+                await db.commit()
+        await self.consolidate_extracted_events(extracted_events_db)
 
-    async def consolidate_extracted_events(self, extracted_events_db: list[ExtractedEventDB], db: AsyncSession):
+    async def consolidate_extracted_events(self, extracted_events_db: list[ExtractedEventDB]):
         """After ExtractedEvents have been added to the database, either merge them into existing EventDBs or create new EventDBs from them."""
         for extracted_event_db in extracted_events_db:
-            event_with_similarity: tuple[EventDB, float] | None = (
-                await db.execute(
-                    select(
-                        EventDB,
-                        (1 - EventDB.semantic_vector.cosine_distance(extracted_event_db.semantic_vector)).label(
-                            "similarity"
-                        ),
+            # Use a fresh session for each event to minimize transaction duration
+            async with get_db_session() as db:
+                event_with_similarity: tuple[EventDB, float] | None = (
+                    await db.execute(
+                        select(
+                            EventDB,
+                            (1 - EventDB.semantic_vector.cosine_distance(extracted_event_db.semantic_vector)).label(
+                                "similarity"
+                            ),
+                        )
+                        .where(EventDB.semantic_vector.isnot(None))
+                        .where(EventDB.topic_id == extracted_event_db.topic_id)
+                        .order_by(text("similarity DESC"))
+                        .limit(1)
                     )
-                    .where(EventDB.semantic_vector.isnot(None))
-                    .order_by(text("similarity DESC"))
-                    .limit(1)
+                ).first()
+                event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
+
+                # TODO: change to if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD, remove the latter condition in the next if clause, once confident about the threshold value
+                if event_db:
+                    merge_response = await self.merge_with_llm_if_same_event(extracted_event_db, event_db)
+                    await self.store_event_comparison(
+                        extracted_event_db,
+                        event_db,
+                        similarity,
+                        similarity > CONSIDER_SAME_EVENT_THRESHOLD,
+                        merge_response.is_same_event,
+                        db,
+                    )
+
+                    self.logger.info(
+                        "Closest match for <cyan>{title_1}</cyan> ({id_1}) is <cyan>{title_2}</cyan> ({id_2}) with similarity <yellow>{similarity}</yellow>. LLM considers them the same event: {same_event}",
+                        title_1=extracted_event_db.title,
+                        id_1=extracted_event_db.id,
+                        title_2=event_db.title,
+                        id_2=event_db.id,
+                        similarity=similarity,
+                        same_event=merge_response.is_same_event,
+                    )
+                    # if extracted_event_db and event_db both refer to the same real-world event according to their vector scores and merge_with_llm_if_same_event, merge them
+                    if merge_response.is_same_event and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
+                        self.logger.info(
+                            "### Merging <cyan>{title_1}</cyan> ({id_1}) into <cyan>{title_2}</cyan> ({id_2})",
+                            title_1=extracted_event_db.title,
+                            id_1=extracted_event_db.id,
+                            title_2=event_db.title,
+                            id_2=event_db.id,
+                        )
+                        extracted_event_db.event_id = event_db.id
+
+                        db.add(extracted_event_db)
+                        await db.flush()
+                        await self.update_event_db(event_db, extracted_event_db, merge_response, db)
+                        await db.commit()
+                        continue
+
+                # if we get here, no similar event was found, so we create a new one
+                self.logger.info(
+                    "### No similar event found for <cyan>{title}</cyan> ({id}), creating new event",
+                    title=extracted_event_db.title,
+                    id=extracted_event_db.id,
                 )
-            ).first()
-            event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
-
-            # TODO: change to if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD, remove the latter condition in the next if clause, once confident about the threshold value
-            if event_db:
-                merge_response = await self.merge_with_llm_if_same_event(extracted_event_db, event_db, db)
-                await self.store_event_comparison(
-                    extracted_event_db,
-                    event_db,
-                    similarity,
-                    similarity > CONSIDER_SAME_EVENT_THRESHOLD,
-                    merge_response.is_same_event,
-                    db,
-                )
-
-                print(
-                    f"Closest match for {extracted_event_db.title} is {event_db.title} with similarity {similarity}. LLM considers them the same event: {merge_response.is_same_event}"
-                )
-                # if extracted_event_db and event_db both refer to the same real-world event according to their vector scores and merge_with_llm_if_same_event, merge them
-                if merge_response.is_same_event and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
-                    print(f"### Merging {extracted_event_db.title} into {event_db.title}")
-                    extracted_event_db.event_id = event_db.id
-
-                    db.add(extracted_event_db)
-                    await db.flush()
-                    await self.update_event_db(event_db, extracted_event_db, merge_response, db)
-                    continue
-
-            # if we get here, no similar event was found, so we create a new one
-            print(f"### No similar event found for {extracted_event_db.title}, creating new event")
-            new_event = EventDB.from_extracted_event_db(extracted_event_db)
-            db.add(new_event)
-            await db.flush()
-            extracted_event_db.event_id = new_event.id
-            db.add(extracted_event_db)
-            await db.flush()
-        await db.commit()
+                new_event = EventDB.from_extracted_event_db(extracted_event_db)
+                db.add(new_event)
+                await db.flush()
+                extracted_event_db.event_id = new_event.id
+                db.add(extracted_event_db)
+                await db.flush()
+                await db.commit()
 
     async def extract_sources_from_single_source(
-        self, data: dict[str, WebSourceWithMarkdown | ScrapingState]
+        self, data: dict[str, WebSourceWithMarkdown | ScrapingState | int | int]
     ) -> dict[str, list[WebSourceWithMarkdown] | list]:
         """Extract additional sources from a single web source."""
         # to skip this part, simply return {}
@@ -349,42 +373,139 @@ class Scraper:
             # TODO: unpacking source and dict like this this works. Verify if it is consistent with Langgraph design though, or causes problems down the road. If so, encapsulate source in ScrapingState?
             source: WebSourceWithMarkdown = data["source"]
             state: ScrapingState = data["state"]
+            current: int = data["current"]
+            total: int = data["total"]
 
             source._visited = True
-            print(f"Processing source: {source.url}")
+
             messages = [
                 self.source_extraction_system_message,
                 HumanMessage(f"Extract sources from the following webpage: {source.markdown}"),
             ]
             response = await self.llm_service.source_extracting_llm.ainvoke(messages)
             extracted_sources: list[WebSourceBase] = response["parsed"].sources
-            print(f"Found {len(extracted_sources)} URLs to extract from {source.url}")
+            self.logger.info(
+                f"Found {len(extracted_sources)} URLs to scrape from source {current}/{total}: {source.url}. Scraping them now."
+            )
 
-            sources = []
+            # sources = []
+            # for extracted_source in extracted_sources:
+            #     new_source = await download_and_parse_article(
+            #         extracted_source.url,
+            #         date_according_to_calling_func=extracted_source.date,
+            #         prefer_own_publish_date=True,
+            #         degrees_of_separation=source.degrees_of_separation + 1,
+            #     )
+            #     if new_source and new_source.date >= state.scraping_source.last_scraped_at:
+            #         sources.append(new_source)
+            tasks = []
             for extracted_source in extracted_sources:
-                new_source = await download_and_parse_article(
+                task = download_and_parse_article(
                     extracted_source.url,
                     date_according_to_calling_func=extracted_source.date,
                     prefer_own_publish_date=True,
                     degrees_of_separation=source.degrees_of_separation + 1,
+                    logger=self.logger,
                 )
-                if new_source and new_source.date >= state.scraping_source.last_scraped_at:
-                    sources.append(new_source)
+                tasks.append(task)
 
-            print(f"Successfully extracted {len(sources)} sources from {source.url}")
+            # Execute all downloads in parallel
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            sources = []
+            exceptions, outdated = 0, 0
+            for result in results:
+                if isinstance(result, Exception):
+                    exceptions += 1
+                    continue  # Skip failed downloads
+                if result and result.date >= state.scraping_source.last_scraped_at:
+                    sources.append(result)
+                else:
+                    outdated += 1
+
+            self.logger.info(
+                "✅ Successfully extracted <yellow>{count}</yellow> sources from source <yellow>{current}</yellow>/<cyan>{total}</cyan>: {url}. Skipped <yellow>{exceptions}</yellow> exceptions and <yellow>{outdated}</yellow> outdated sources.",
+                count=len(sources),
+                current=current,
+                total=total,
+                url=source.url,
+                exceptions=exceptions,
+                outdated=outdated,
+            )
+
+            sources = await self.remove_duplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
 
         except Exception as e:
-            print(f"ERROR in extract_sources_from_single_source for {source.url}: {e}")
+            self.logger.error(
+                "❌ ERROR in extract_sources_from_single_source for source <yellow>{current}</yellow>/<cyan>{total}</cyan>: {url}: <red>{e}</red>",
+                current=current,
+                total=total,
+                url=source.url,
+                e=e,
+            )
             return {"sources": []}
 
     async def start_source_extraction(self, state: ScrapingState):
         """Initial node that populates state.sources from the scraping source."""
         if not state.sources and not state.scraping_source._visited:
-            sources = await web_sources_from_scraping_source(state.scraping_source)
+            self.logger.info(
+                "Starting source extraction for Scraping Source <cyan>{id}</cyan> ({base_url})",
+                id=state.scraping_source.id,
+                base_url=state.scraping_source.base_url,
+            )
+            sources = await web_sources_from_scraping_source(state.scraping_source, self.logger)
+            # sources = await self.remove_duplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
         else:
             return {}
+
+    async def remove_duplicate_sources(self, sources: list[WebSourceBase], scraping_source: ScrapingSourceDB):
+        """Remove duplicate sources from the list."""
+        # TODO: Create separate table "sources" that sources get added to with url and date even if no events were extracted from them, use that for duplicate checking
+        duplicates = 0
+        async with get_db_session() as db:
+            for i in range(len(sources) - 1, -1, -1):
+                
+                source = sources[i]
+
+                if not isinstance(source.date, datetime.datetime):
+                    self.logger.info(
+                        "❌ Dropping source {url} as it has no valid date",
+                        url=source.url,
+                    )
+                    duplicates += 1
+                    sources.pop(i)
+                    continue
+
+                source.date = ExtractedEventDB.convert_date_to_utc(source.date)
+                if existing := (
+                    await db.execute(
+                        select(ExtractedEventDB)
+                        .where(ExtractedEventDB.source_url == source.url)
+                        .where(ExtractedEventDB.source_published_date == source.date)
+                        .where(ExtractedEventDB.topic_id == scraping_source.topic_id)
+                    )
+                ).scalars().first():
+                    self.logger.info(
+                        "❌ Dropping source {url} (<yellow>{date}</yellow>) as it is a duplicate to ExtractedEventDB <cyan>{id}</cyan> with title <cyan>{title}</cyan>",
+                        url=source.url,
+                        date=source.date,
+                        id=existing.id,
+                        title=existing.title,
+                    )
+                    duplicates += 1
+                    sources.pop(i)
+
+            self.logger.info(
+                "✅ Found <yellow>{total}</yellow> sources for Scraping Source <cyan>{id}</cyan> ({base_url}), out of which <yellow>{duplicates}</yellow> were dropped as duplicates and <yellow>{remaining}</yellow> were kept.",
+                total=len(sources) + duplicates,
+                id=scraping_source.id,
+                base_url=scraping_source.base_url,
+                duplicates=duplicates,
+                remaining=len(sources),
+            )
+            return sources
 
     async def route_to_source_extraction(self, state: ScrapingState):
         """Route to source extraction for parallel processing."""
@@ -394,24 +515,37 @@ class Scraper:
             for source in state.sources
             if source.degrees_of_separation < state.scraping_source.degrees_of_separation and not source._visited
         ]
-        print(f"State has {len(state.sources)} sources")
+        self.logger.info(
+            "State has <yellow>{count}</yellow> sources, of which <yellow>{eligible}</yellow> are eligible for expansion (degrees of separation < {degrees_of_separation})",
+            count=len(state.sources),
+            eligible=len(eligible_sources),
+            degrees_of_separation=state.scraping_source.degrees_of_separation,
+        )
 
         if eligible_sources:
-            print(f"Routing {len(eligible_sources)} eligible sources to source extraction")
+            self.logger.info(
+                "Routing <yellow>{count}</yellow> eligible sources to source extraction",
+                count=len(eligible_sources),
+            )
             return [
-                Send("extract_sources_from_single_source", {"source": source, "state": state})
-                for source in eligible_sources
+                Send(
+                    "extract_sources_from_single_source",
+                    {"source": source, "state": state, "current": i, "total": len(eligible_sources)},
+                )
+                for i, source in enumerate(eligible_sources, 1)
             ]
         else:
-            print("No eligible sources for extraction, proceeding to event extraction")
+            self.logger.info("No eligible sources for source extraction, proceeding to event extraction")
             return "prepare_event_extraction"
 
-    async def extract_events_from_single_source(self, data: dict[str, WebSourceWithMarkdown | ScrapingState]):
+    async def extract_events_from_single_source(
+        self, data: dict[str, WebSourceWithMarkdown | ScrapingState | int | int]
+    ):
         """Extract events from a single source."""
         source: WebSourceWithMarkdown = data["source"]
         state: ScrapingState = data["state"]
-
-        print(f"Extracting events from source: {source.url}")
+        current: int = data["current"]
+        total: int = data["total"]
 
         event_extraction_message = await self.llm_service.get_event_extraction_system_message(
             topic=state.scraping_source.topic,
@@ -426,9 +560,21 @@ class Scraper:
         try:
             response = await self.llm_service.event_extracting_llm.ainvoke(messages)
             events: list[ExtractedEventBase] = response["parsed"].events
-            print(f"Extracted {len(events)} events from {source.url}")
+            self.logger.info(
+                "✅ Extracted <yellow>{num}</yellow> events from source <yellow>{current}</yellow>/<cyan>{total}</cyan>: {url}",
+                num=len(events),
+                current=current,
+                total=total,
+                url=source.url,
+            )
         except Exception as e:
-            print(f"ERROR in extract_events_from_single_source for {source.url}: {e}")
+            self.logger.error(
+                "❌ ERROR in extract_events_from_single_source for source <yellow>{current}</yellow>/<cyan>{total}</cyan>: {url}: <red>{e}</red>",
+                current=current,
+                total=total,
+                url=source.url,
+                e=e,
+            )
             return {"events": []}
 
         source_without_markdown = WebSourceWithMetadata.from_web_source_with_markdown(source)
@@ -436,33 +582,42 @@ class Scraper:
         return {"events": events_with_source}
 
     async def prepare_event_extraction(self, state: ScrapingState):
-        """Pass-through node that prepares for event extraction."""
-        print(f"=== PREPARE EVENT EXTRACTION ===")
-        print(f"Total sources in state: {len(state.sources)}")
-        print(f"Events so far: {len(state.events)}")
+        """Pass-through node on the way to event extraction."""
+        # TODO: check if we can get rid of this
+        self.logger.info("=== PREPARE EVENT EXTRACTION ===")
         return {}
 
     async def route_to_event_extraction(self, state: ScrapingState):
         """Route to event extraction for parallel processing."""
-        print(f"Event extraction phase - state has {len(state.sources)} total sources")
+        self.logger.info(
+            "Event extraction phase - state has <yellow>{count}</yellow> total sources",
+            count=len(state.sources),
+        )
 
         if not state.sources:
-            print("WARNING: No sources available for event extraction!")
+            self.logger.warning("❌ WARNING: No sources available for event extraction!")
             return []
 
         return [
-            Send("extract_events_from_single_source", {"source": source, "state": state}) for source in state.sources
+            Send(
+                "extract_events_from_single_source",
+                {"source": source, "state": state, "current": i, "total": len(state.sources)},
+            )
+            for i, source in enumerate(state.sources, 1)
         ]
 
     async def print_events(self, state: ScrapingState):
         """Print all collected events to the console."""
-        print(f"FINAL RESULTS: Found {len(state.events)} total events")
+        self.logger.info(
+            "FINAL RESULTS: Found <yellow>{count}</yellow> total events",
+            count=len(state.events),
+        )
         for i, event in enumerate(state.events, 1):
-            print(f"\nEvent {i}:")
-            pprint(event)
+            self.logger.info("\nEvent <yellow>{i}</yellow>:\n{event}", i=i, event=event)
         return state
 
     async def scrape_with_checkpointer(self):
+        """Currently unused, issue filed under https://github.com/langchain-ai/langgraph/issues/5675"""
         async with get_db_session() as db:
             thread_id = (
                 (
@@ -485,14 +640,17 @@ class Scraper:
 
             snapshot_config = {"configurable": {"thread_id": thread_id - 1}}
             async for snapshot in self.graph.aget_state_history(snapshot_config):
-                print(f"Checkpoint {snapshot.config['configurable']['checkpoint_id']}")
-                print(f"Next: {snapshot.next}")
-            print(snapshot)
+                self.logger.info(
+                    "Checkpoint <yellow>{checkpoint}</yellow>",
+                    checkpoint=snapshot.config["configurable"]["checkpoint_id"],
+                )
+                self.logger.info("Next: {next}", next=snapshot.next)
+            self.logger.info(snapshot)
 
             try:
                 await self.graph.ainvoke(self.scraping_state, config=config)
             except Exception as e:  # TODO: Seems fine to ignore the error, figure out why it happens though
-                print(f"Error: {e}")
+                self.logger.error("Error: <red>{e}</red>", e=e)
 
     async def scrape(self):
         await self._prepare_scraper()
@@ -510,7 +668,7 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
-            scraping_source.last_scraped_at = datetime.now(timezone.utc)
+            scraping_source.last_scraped_at = datetime.datetime.now(timezone.utc)
             db.add(scraping_source)
             await db.commit()
             await db.refresh(scraping_source)
@@ -528,15 +686,16 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
-            scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 
-            # Initialize LLM service
-            self.llm_service = LlmService()
+        scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 
-            # This message, unlike the one for event extraction, is static, so we can create it here
-            self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
-                scraping_source_workflow.topic
-            )
+        # Initialize LLM service
+        self.llm_service = LlmService()
+
+        # This message, unlike the one for event extraction, is static, so we can create it here
+        self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
+            scraping_source_workflow.topic
+        )
 
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
@@ -591,26 +750,37 @@ class Scraper:
         self.graph_builder.add_edge("print_events", END)
 
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
+        self.logger.info("Graph compiled")
 
     async def test(self, semantic_content: str):
-        print(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))
+        self.logger.info(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))
 
     @classmethod
     async def scrape_source(cls, source_id: int):
         """Entry point for scheduled scraping jobs"""
-        from datetime import datetime
 
         try:
-            start_time = datetime.now()
-            print(f"Starting scrape job for source {source_id} at {start_time}")
+            start_time = datetime.datetime.now()
+            logger.info(
+                "Starting scrape job for source <cyan>{source_id}</cyan> at <yellow>{start_time}</yellow>",
+                source_id=source_id,
+                start_time=start_time,
+            )
 
             scraper = cls(source_id)
             await scraper.scrape()
 
-            end_time = datetime.now()
-            duration = end_time - start_time
-            print(f"Completed scrape job for source {source_id} in {duration}")
+            duration = datetime.datetime.now() - start_time
+            logger.info(
+                "Completed scrape job for source <cyan>{source_id}</cyan> in <yellow>{duration}</yellow>",
+                source_id=source_id,
+                duration=duration,
+            )
 
         except Exception as e:
-            print(f"Scrape job failed for source {source_id}: {e}")
+            logger.error(
+                "❌ Scrape job failed for source <cyan>{source_id}</cyan>: <red>{e}</red>",
+                source_id=source_id,
+                e=e,
+            )
             raise  # so apscheduler logs the failure
