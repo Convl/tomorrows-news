@@ -154,3 +154,42 @@ Settings in `app/core/config.py` use pydantic-settings with `.env` loading:
 **LangGraph Workflows**: Event extraction uses persistent workflows with PostgreSQL checkpointing for reliability and resume capability.
 
 **Frontend Simplification**: HTML/CSS/JS approach with no build system for rapid development and deployment.
+
+## Frontend Structure
+
+The frontend is located in the `frontend/` directory and consists of static HTML/CSS/JS files:
+
+```
+frontend/
+├── assets/
+│   └── theme.css              # Main stylesheet with CSS custom properties
+├── js/
+│   ├── common-ui.js           # Shared UI utilities and components
+│   ├── form-handlers.js       # Form submission and validation logic
+│   ├── field-help.js          # Help text and tooltips for form fields
+│   └── choices.js             # Select dropdown enhancements
+├── *.html                     # Individual page templates (login, register, etc.)
+├── dashboard.html             # Main application dashboard
+├── topic-*.html               # Topic management pages
+└── feed-*.html                # Feed/source management pages
+```
+
+**Frontend Development Notes**:
+- No build process required - static files served directly by FastAPI
+- Uses vanilla JavaScript with modern ES6+ features  
+- CSS custom properties for theming support
+- Form validation integrated with FastAPI validation responses
+- Frontend served at `/app/` path with FastAPI static file serving
+
+## Development Environment
+
+**Python Version**: Requires Python 3.12+ (specified in pyproject.toml)
+**Package Management**: Uses `uv` for fast dependency resolution and virtual environment management
+**Code Quality**: Configured with `ruff` for both linting and formatting (line length: 120 chars)
+**Database**: PostgreSQL with pgvector extension required for vector similarity operations
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

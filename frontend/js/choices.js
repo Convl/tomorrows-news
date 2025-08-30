@@ -14,93 +14,92 @@ const LANGUAGE_NAME_BY_CODE = {
     bg: 'Bulgarian', hr: 'Croatian', sl: 'Slovenian', sk: 'Slovak', et: 'Estonian', lv: 'Latvian', lt: 'Lithuanian',
     ru: 'Russian', tr: 'Turkish', ar: 'Arabic', he: 'Hebrew', zh: 'Chinese', ja: 'Japanese', ko: 'Korean', hi: 'Hindi'
 };
-export async function fetchCountryOptions(includeBlank = true) {
+function processOptionsData(data, nameByCode, isCountry = false) {
+    return (Array.isArray(data) ? data : [])
+        .map(entry => {
+            if (typeof entry === 'string') {
+                const code = isCountry ? entry.toUpperCase() : String(entry);
+                const name = nameByCode[code] || code;
+                return { value: code, label: `${name} (${code})`, name };
+            } else {
+                const code = isCountry ? String(entry.code || '').toUpperCase() : String(entry.code || '');
+                const name = String(entry.name || nameByCode[code] || code);
+                return { value: code, label: `${name} (${code})`, name };
+            }
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+async function fetchOptions(url, nameByCode, isCountry = false, includeBlank = true) {
     try {
-        const response = await fetch('/app/js/countries.json', { cache: 'no-store' });
-        if (!response.ok) throw new Error('countries fetch failed');
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`${url} fetch failed`);
         const data = await response.json();
-        const options = (Array.isArray(data) ? data : [])
-            .map(entry => {
-                if (typeof entry === 'string') {
-                    const code = entry.toUpperCase();
-                    const name = COUNTRY_NAME_BY_CODE[code] || code;
-                    return { value: code, label: `${name} (${code})`, name };
-                } else {
-                    const code = String(entry.code || '').toUpperCase();
-                    const name = String(entry.name || COUNTRY_NAME_BY_CODE[code] || code);
-                    return { value: code, label: `${name} (${code})`, name };
-                }
-            })
-            .sort((a, b) => a.label.localeCompare(b.label));
+        const options = processOptionsData(data, nameByCode, isCountry);
         if (includeBlank) options.unshift({ value: '', label: '—' });
         return options;
     } catch {
         return [{ value: '', label: '—' }];
     }
+}
+
+export async function fetchCountryOptions(includeBlank = true) {
+    return fetchOptions('/app/js/countries.json', COUNTRY_NAME_BY_CODE, true, includeBlank);
 }
 
 export async function fetchLanguageOptions(includeBlank = true) {
-    try {
-        const response = await fetch('/app/js/languages.json', { cache: 'no-store' });
-        if (!response.ok) throw new Error('languages fetch failed');
-        const data = await response.json();
-        const options = (Array.isArray(data) ? data : [])
-            .map(entry => {
-                if (typeof entry === 'string') {
-                    const code = String(entry);
-                    const name = LANGUAGE_NAME_BY_CODE[code] || code;
-                    return { value: code, label: `${name} (${code})`, name };
-                } else {
-                    const code = String(entry.code || '');
-                    const name = String(entry.name || LANGUAGE_NAME_BY_CODE[code] || code);
-                    return { value: code, label: `${name} (${code})`, name };
-                }
-            })
-            .sort((a, b) => a.label.localeCompare(b.label));
-        if (includeBlank) options.unshift({ value: '', label: '—' });
-        return options;
-    } catch {
-        return [{ value: '', label: '—' }];
+    return fetchOptions('/app/js/languages.json', LANGUAGE_NAME_BY_CODE, false, includeBlank);
+}
+
+function extractEnumValues(comp) {
+    // Try multiple schema paths
+    const schemaPaths = [
+        comp?.ScrapingSourceBase?.properties?.source_type,
+        comp?.ScrapingSourceCreate?.properties?.source_type
+    ];
+
+    for (const schema of schemaPaths) {
+        if (schema?.enum && Array.isArray(schema.enum)) {
+            return schema.enum;
+        }
+        if (schema?.$ref) {
+            const refName = schema.$ref.split('/').pop();
+            const refSchema = comp[refName];
+            if (refSchema?.enum && Array.isArray(refSchema.enum)) {
+                return refSchema.enum;
+            }
+        }
     }
+
+    // Direct enum fallback
+    if (comp?.ScrapingSourceEnum?.enum) {
+        return comp.ScrapingSourceEnum.enum;
+    }
+
+    return ['Webpage', 'Rss', 'Api']; // Final fallback
 }
 
 export async function fetchSourceTypeOptions() {
+    const fallback = [
+        { value: 'Webpage', label: 'Webpage', disabled: false },
+        { value: 'Rss', label: 'Rss', disabled: false },
+        { value: 'Api', label: 'Api (Coming Soon)', disabled: true },
+    ];
+
     try {
         const res = await fetch('/openapi.json', { cache: 'no-store' });
         if (!res.ok) throw new Error('openapi fetch failed');
+        
         const spec = await res.json();
-        const comp = spec?.components?.schemas || {};
-        let schema = comp?.ScrapingSourceBase?.properties?.source_type || comp?.ScrapingSourceCreate?.properties?.source_type;
-        let values = [];
-        if (schema?.enum && Array.isArray(schema.enum)) {
-            values = schema.enum;
-        } else if (schema?.$ref) {
-            const ref = schema.$ref; // e.g. '#/components/schemas/ScrapingSourceEnum'
-            const parts = ref.split('/');
-            const name = parts[parts.length - 1];
-            const refSchema = comp[name];
-            if (refSchema?.enum && Array.isArray(refSchema.enum)) {
-                values = refSchema.enum;
-            }
-        }
-        if (!values.length && comp?.ScrapingSourceEnum?.enum) {
-            values = comp.ScrapingSourceEnum.enum;
-        }
-        if (!values.length) {
-            // Fallback
-            values = ['Webpage', 'Rss', 'Api'];
-        }
+        const values = extractEnumValues(spec?.components?.schemas || {});
+        
         return values.map(v => ({
             value: v,
             label: v === 'Api' ? 'Api (Coming Soon)' : v,
             disabled: v === 'Api'
         }));
     } catch {
-        return [
-            { value: 'Webpage', label: 'Webpage', disabled: false },
-            { value: 'Rss', label: 'Rss', disabled: false },
-            { value: 'Api', label: 'Api (Coming Soon)', disabled: true },
-        ];
+        return fallback;
     }
 }
 

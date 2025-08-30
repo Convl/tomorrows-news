@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Edit Feed • Tomorrow's News</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="/app/assets/theme.css" rel="stylesheet" />
+</head>
+
+<body class="bg-light">
+  <main class="container py-5">
+    <div class="main-container">
+      <a href="/app/dashboard.html" class="btn btn-link mb-4">← Back</a>
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-4">
+            <div class="icon-placeholder icon-web me-3">📡</div>
+            <h1 class="h4 mb-0 fw-semibold">Edit Feed</h1>
+          </div>
+          <div id="alert" class="alert d-none" role="alert"></div>
+          <div id="form"></div>
+          <div class="d-grid gap-2 mt-4">
+            <button id="save" class="btn btn-primary">💾 Save Changes</button>
+            <button id="delete" class="btn btn-outline-danger">🗑️ Delete Feed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="/app/js/config.js"></script>
+  <script type="module" src="/app/js/choices.js"></script>
+  <script type="module" src="/app/js/field-help.js"></script>
+  <script type="module">
+    import { apiBase, authHeaders, getToken } from '/app/js/config.js';
+    import { fetchCountryOptions, fetchLanguageOptions, fetchSourceTypeOptions, populateSelect } from '/app/js/choices.js';
+    import { addHelpIcon, addHelpText, addSelectDynamicHelp, HELP_TEXTS } from '/app/js/field-help.js';
+    const alertEl = document.getElementById('alert');
+    if (!getToken()) { window.location.href = '/app/login.html'; }
+    const params = new URLSearchParams(window.location.search);
+    const id = parseInt(params.get('id'), 10);
+    const formRoot = document.getElementById('form');
+    formRoot.innerHTML = `
+            <div class="mb-4">
+              <label class="form-label" for="name">📝 Name</label>
+              <input class="form-control" id="name" placeholder="e.g., Presseschau der LTO" />
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="base_url">🔗 Base URL</label>
+              <input class="form-control" id="base_url" type="url" placeholder="https://example.com" />
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="source_type">🔧 Source Type</label>
+              <select class="form-select" id="source_type"></select>
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="language">🗣️ Language</label>
+              <select class="form-select" id="language"></select>
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="degrees_of_separation">🔗 Degrees of separation</label>
+              <select class="form-select" id="degrees_of_separation">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </div>
+            <div class="mb-4">
+              <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency</label>
+              <div class="row g-2">
+                <div class="col-8">
+                  <input class="form-control" id="scraping_frequency_value" type="number" min="1" />
+                </div>
+                <div class="col-4">
+                  <select class="form-select" id="scraping_frequency_unit">
+                    <option value="days">Days</option>
+                    <option value="hours">Hours</option>
+                    <option value="minutes">Minutes</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+        `;
+    const saveBtn = document.getElementById('save');
+    let original = null;
+    async function init() {
+      const resp = await fetch(`${apiBase}/scraping-sources/${id}`, { headers: authHeaders() });
+      if (!resp.ok) { alertEl.textContent = 'Failed to load source'; alertEl.className = 'alert alert-danger'; return; }
+      original = await resp.json();
+      populateSelect(document.getElementById('language'), await fetchLanguageOptions(true), original.language_code || '');
+      populateSelect(document.getElementById('source_type'), await fetchSourceTypeOptions(), original.source_type || '');
+      document.getElementById('name').value = original.name || '';
+      document.getElementById('base_url').value = original.base_url || '';
+      document.getElementById('degrees_of_separation').value = original.degrees_of_separation ?? 2;
+
+      // Convert scraping frequency from minutes to appropriate units for display
+      const frequencyMinutes = original.scraping_frequency ?? 1440;
+      let displayValue, displayUnit;
+
+      if (frequencyMinutes >= 1440 && frequencyMinutes % 1440 === 0) {
+        displayValue = frequencyMinutes / 1440;
+        displayUnit = 'days';
+      } else if (frequencyMinutes >= 60 && frequencyMinutes % 60 === 0) {
+        displayValue = frequencyMinutes / 60;
+        displayUnit = 'hours';
+      } else {
+        displayValue = frequencyMinutes;
+        displayUnit = 'minutes';
+      }
+
+      document.getElementById('scraping_frequency_value').value = displayValue;
+      document.getElementById('scraping_frequency_unit').value = displayUnit;
+
+      // Initialize help system
+      setupFieldHelp();
+    }
+
+    function setupFieldHelp() {
+      // Add help icons with comprehensive explanations
+      addHelpIcon('label[for="name"]', 'Source name, e.g. "Presseschau der LTO", "Politikressort der F.A.Z.", "Pressemitteilungen des Bundesgerichtshofs"');
+
+      addHelpIcon('label[for="base_url"]', 'Webpage or RSS feed URL that will contain the news, e.g. https://www.bundesgerichtshof.de/DE/Presse/Pressemitteilungen/pressemitteilungen_node.html, https://www.lto.de/presseschau-rss/rss/feed.xml');
+
+      addHelpIcon('label[for="scraping_frequency"]', 'How often this feed shall be scraped for new events (minimum: 1 day / 24 hours / 1440 minutes)');
+
+      addHelpIcon('label[for="degrees_of_separation"]', 'Where information about upcoming events is expected to be found, relative to the base url.<br><br><strong>1</strong> = News content found DIRECTLY ON THE BASE URL, such as with a long-running liveblog. This option is rare / exotic)<br><br><strong>2</strong> = News content LINKED TO FROM THE BASE URL, such as with the base url or specific subsections (politics, business, etc) of any online news outlet. This option is by far the most common<br><br><strong>3</strong> = News content LINKED TO FROM THE BASE URL, but contains further links, which must also be scraped. Use this option for press reviews or similar types of curated overviews, e.g. https://www.lto.de/recht/presseschau');
+
+      // Add dynamic help for source type dropdown
+      addSelectDynamicHelp('#source_type', HELP_TEXTS.SOURCE_TYPES, 'Select how you want to monitor this source for new content.');
+    }
+    function computePatch() {
+      const languageEl = document.getElementById('language');
+
+      // Convert scraping frequency to minutes
+      const frequencyValue = parseInt(document.getElementById('scraping_frequency_value').value, 10) || 1;
+      const frequencyUnit = document.getElementById('scraping_frequency_unit').value;
+      let scrapingFrequencyMinutes;
+
+      switch (frequencyUnit) {
+        case 'days':
+          scrapingFrequencyMinutes = frequencyValue * 24 * 60;
+          break;
+        case 'hours':
+          scrapingFrequencyMinutes = frequencyValue * 60;
+          break;
+        case 'minutes':
+          scrapingFrequencyMinutes = frequencyValue;
+          break;
+        default:
+          scrapingFrequencyMinutes = 1440; // Default to 1 day
+      }
+
+      // Ensure minimum of 1440 minutes (1 day)
+      scrapingFrequencyMinutes = Math.max(scrapingFrequencyMinutes, 1440);
+
+      const current = {
+        name: document.getElementById('name').value.trim() || null,
+        base_url: document.getElementById('base_url').value.trim() || null,
+        source_type: document.getElementById('source_type').value || null,
+        language: languageEl.options[languageEl.selectedIndex]?.dataset?.name || (languageEl.value || null),
+        language_code: languageEl.value || null,
+        degrees_of_separation: parseInt(document.getElementById('degrees_of_separation').value, 10),
+        scraping_frequency: scrapingFrequencyMinutes,
+        is_active: true, // Always set to active
+      };
+      const patch = {};
+      for (const [k, v] of Object.entries(current)) {
+        if (JSON.stringify(v) !== JSON.stringify(original[k] ?? null)) patch[k] = v;
+      }
+      return patch;
+    }
+    saveBtn.onclick = async () => {
+      alertEl.className = 'alert d-none';
+      const patch = computePatch();
+      try {
+        const resp = await fetch(`${apiBase}/scraping-sources/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(patch) });
+        if (!resp.ok) throw new Error('Failed to save changes');
+        window.location.href = '/app/dashboard.html';
+      } catch (err) {
+        alertEl.textContent = err.message || 'Failed to save changes';
+        alertEl.className = 'alert alert-danger';
+      }
+    };
+
+    // Delete functionality
+    const deleteBtn = document.getElementById('delete');
+    deleteBtn.onclick = async () => {
+      const feedName = original?.name || 'this feed';
+      const confirmed = confirm(`⚠️ Are you sure you want to delete "${feedName}"?\n\nThis action cannot be undone and will stop all scheduled scraping for this feed.`);
+
+      if (!confirmed) return;
+
+      alertEl.className = 'alert d-none';
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = '🗑️ Deleting...';
+
+      try {
+        const resp = await fetch(`${apiBase}/scraping-sources/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+
+        if (!resp.ok) {
+          const error = await resp.text();
+          throw new Error(error || 'Failed to delete feed');
+        }
+
+        alertEl.textContent = '✅ Feed deleted successfully. Redirecting...';
+        alertEl.className = 'alert alert-success';
+
+        setTimeout(() => {
+          window.location.href = '/app/dashboard.html';
+        }, 1500);
+
+      } catch (err) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = '🗑️ Delete Feed';
+        alertEl.textContent = err.message || 'Failed to delete feed';
+        alertEl.className = 'alert alert-danger';
+      }
+    };
+
+    init();
+  </script>
+</body>
+
+</html>
