@@ -7,7 +7,6 @@ You will be given a markdown-converted webpage by the user that should contain a
 If the substantive content contains information about upcoming events that are relevant to the following topic, you need to extract that information.
 Topic name: {topic_name}
 Topic description: {topic_description}
-Topic country: {topic_country}
 When determining the date of an upcoming event, keep in mind that today's date is {current_date}, and that the substantive content you are looking at was published on {publish_date}.
 All extracted information should be in the following language: {language}.
 Notice that the point of this task is to help in creating a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
@@ -34,7 +33,6 @@ You will be given a markdown-converted webpage by the user that should contain a
 If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
 Topic name: {topic_name}
 Topic description: {topic_description}
-Topic country: {topic_country}
 """
 )
 

@@ -58,7 +58,6 @@ class LlmService:
         return await EVENT_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
-            topic_country=topic.country,
             current_date=datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d. of %B %Y"),
             publish_date=publish_date.strftime("%A, %d. of %B %Y"),
             language=language,
@@ -69,5 +68,4 @@ class LlmService:
         return await SOURCE_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
-            topic_country=topic.country,
         )

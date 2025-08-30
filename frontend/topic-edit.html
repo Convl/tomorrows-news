@@ -32,9 +32,11 @@
 
     <script type="module" src="/app/js/config.js"></script>
     <script type="module" src="/app/js/choices.js"></script>
+    <script type="module" src="/app/js/field-help.js"></script>
     <script type="module">
         import { apiBase, authHeaders, getToken } from '/app/js/config.js';
-        import { fetchCountryOptions, populateSelect } from '/app/js/choices.js';
+        import { populateSelect } from '/app/js/choices.js';
+        import { addHelpIcon, addHelpText } from '/app/js/field-help.js';
         const alertEl = document.getElementById('alert');
         if (!getToken()) { window.location.href = '/app/login.html'; }
         const params = new URLSearchParams(window.location.search);
@@ -43,19 +45,11 @@
         formRoot.innerHTML = `
             <div class="mb-4">
               <label class="form-label" for="name">📝 Name</label>
-              <input class="form-control" id="name" placeholder="Enter topic name..." />
+              <input class="form-control" id="name" placeholder="e.g., Law & Legislation in Germany" />
             </div>
             <div class="mb-4">
               <label class="form-label" for="description">📄 Description</label>
-              <textarea class="form-control" id="description" rows="3" placeholder="Describe what this topic covers..."></textarea>
-            </div>
-            <div class="mb-4">
-              <label class="form-label" for="country">🌍 Country</label>
-              <select class="form-select" id="country"></select>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="is_active" />
-              <label class="form-check-label fw-medium" for="is_active">Active</label>
+              <textarea class="form-control" id="description" rows="4" placeholder="Describe what kinds of events you are interested in..."></textarea>
             </div>
         `;
         const saveBtn = document.getElementById('save');
@@ -64,19 +58,24 @@
             const resp = await fetch(`${apiBase}/topics/${id}`, { headers: authHeaders() });
             if (!resp.ok) { alertEl.textContent = 'Failed to load topic'; alertEl.className = 'alert alert-danger'; return; }
             original = await resp.json();
-            populateSelect(document.getElementById('country'), await fetchCountryOptions(true), original.country_code || '');
             document.getElementById('name').value = original.name || '';
             document.getElementById('description').value = original.description || '';
-            document.getElementById('is_active').checked = !!original.is_active;
+
+            // Initialize help system
+            setupFieldHelp();
+        }
+
+        function setupFieldHelp() {
+            // Add help icons for topic fields
+            addHelpIcon('label[for="name"]', 'A succinct name for the topic about which upcoming events shall be gathered, e.g. "Law & Legislation in Germany", "International developments in artificial intelligence", "Anything and everything having to do with UFOS". The value in this field will be passed to the LLM that assists in the event extraction, and will directly impact the results that you see in your dashboard.');
+
+            addHelpIcon('label[for="description"]', 'A more detailed description of the topic and the kinds of events you are interested in, e.g.: "Court cases and legislative proceedings in Germany that are significant enough to be of interest to the general public", "Only focus on A.I. developments that are likely to impact the job market for software engineers within the next 12 months", "I particularly care about UFO- and Alien-related Festivals and conventions". The value in this field will be passed to the LLM that assists in the event extraction, and will directly impact the results that you see in your dashboard');
         }
         function computePatch() {
-            const countryEl = document.getElementById('country');
             const current = {
                 name: document.getElementById('name').value.trim() || null,
                 description: document.getElementById('description').value.trim() || null,
-                country: countryEl.options[countryEl.selectedIndex]?.dataset?.name || (countryEl.value || null),
-                country_code: countryEl.value || null,
-                is_active: document.getElementById('is_active').checked,
+                is_active: true, // Always set to active
             };
             const patch = {};
             for (const [k, v] of Object.entries(current)) {

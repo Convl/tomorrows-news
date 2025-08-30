@@ -90,12 +90,16 @@ export async function fetchSourceTypeOptions() {
             // Fallback
             values = ['Webpage', 'Rss', 'Api'];
         }
-        return values.map(v => ({ value: v, label: v }));
+        return values.map(v => ({
+            value: v,
+            label: v === 'Api' ? 'Api (Coming Soon)' : v,
+            disabled: v === 'Api'
+        }));
     } catch {
         return [
-            { value: 'Webpage', label: 'Webpage' },
-            { value: 'Rss', label: 'Rss' },
-            { value: 'Api', label: 'Api' },
+            { value: 'Webpage', label: 'Webpage', disabled: false },
+            { value: 'Rss', label: 'Rss', disabled: false },
+            { value: 'Api', label: 'Api (Coming Soon)', disabled: true },
         ];
     }
 }
@@ -107,7 +111,12 @@ export function populateSelect(selectEl, options, selectedValue = '') {
         o.value = opt.value;
         o.textContent = opt.label;
         if (opt.name) o.dataset.name = opt.name;
-        if (opt.value === selectedValue) o.selected = true;
+        if (opt.disabled) {
+            o.disabled = true;
+            o.style.color = '#6b7280'; // Grey color for disabled options
+            o.style.fontStyle = 'italic';
+        }
+        if (opt.value === selectedValue && !opt.disabled) o.selected = true;
         selectEl.appendChild(o);
     }
 }
