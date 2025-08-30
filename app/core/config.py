@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
     PYTHONASYNCIODEBUG: bool = False
+    FILTER_LIBRARY_TRACEBACKS: bool = False  # Workaround to only show tracebacks from app code, not libraries
+
+    # Database connection settings
+    DB_CONNECTION_RETRIES: int = 3
+    DB_RETRY_DELAY_BASE: int = 2
 
     PROJECT_EMAIL: str
     PROJECT_EMAIL_PASSWORD: SecretStr

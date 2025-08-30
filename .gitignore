@@ -1,5 +1,6 @@
 # Custom
 README.md
+.playwright-mcp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

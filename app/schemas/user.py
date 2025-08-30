@@ -7,27 +7,23 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
-    username: str
-    full_name: str | None = None
+    first_name: str
+    last_name: str
     created_at: datetime
     updated_at: datetime
 
 
 class UserCreate(schemas.BaseUserCreate):
-    username: str = Field(..., min_length=3, max_length=100)
-    full_name: str | None = None
-
+    first_name: str
+    last_name: str
 
 class UserUpdate(schemas.BaseUserUpdate):
-    username: str | None = Field(None, min_length=3, max_length=100)
-    full_name: str | None = None
+    first_name: str
+    last_name: str
+    updated_at: datetime = datetime.now()
 
 
-# For backward compatibility with existing code
-UserResponse = UserRead
-
-
-class UserWithTopics(UserResponse):
+class UserWithTopics(UserRead):
     topics: List["TopicResponse"] = []
 
     class Config:

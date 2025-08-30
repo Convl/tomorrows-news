@@ -30,6 +30,7 @@ class ScrapingSourceWorkflow(BaseModel):
     base_url: str
     source_type: ScrapingSourceEnum
     language: str | None = None
+    country_code: str | None = None
     last_scraped_at: datetime | None = None
     degrees_of_separation: int = Field(default=0, ge=0)
     topic: TopicWorkflow
@@ -74,9 +75,6 @@ class ExtractedWebSources(BaseModel):
     """Web sources extracted from content by LLM."""
     sources: list[WebSourceBase] = Field(description="A list of web sources extracted from the web source")
 
-class ExtractedUrls(BaseModel):
-    urls: list[str] = Field(description="A list of URLs extracted from the web source")
-
 
 class ExtractedEventBase(BaseModel):
     """An event extracted from a web source that is relevant to a specific topic of interest."""
@@ -102,6 +100,10 @@ class ExtractedEventBase(BaseModel):
             "2024-03-15T14:30:00",  # Specific time without timezone
         ],
     )
+    snippet: str = Field(
+        description="A short snippet of text from the source, EXACTLY as it appears in the source, specifying when the event will take place.",
+        examples=["The parliamentary vote on the new law is scheduled for the 20th of August 2030."],
+    )
     country_code: str | None = Field(
         default=None,
         description="The ISO 3166-1 alpha-2 code of the country where the event will take place",
@@ -124,9 +126,9 @@ class ExtractedEventBase(BaseModel):
         default=None,
         description="Optional supplementary information about the event, to be stored as key-value pairs. DO NOT include information here that fits more accurately into any of the other fields, or that relates to the source where the event was found.",
         examples=[
-            {"registration_link": "https://www.example.com/registration"},
-            {"reference_number": "1234567890"},
-            {"accreditation_deadline": "2025-08-01"},
+            {"Registration link": "https://www.example.com/registration"},
+            {"Reference number": "1234567890"},
+            {"Accreditation deadline": "2025-08-01"},
         ],
     )
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+import datetime
 
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_openai import ChatOpenAI
@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.schemas.topic import TopicBase
 
 from .scraping_config import EVENT_EXTRACTION_SYSTEM_TEMPLATE, SOURCE_EXTRACTION_SYSTEM_TEMPLATE
-from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedUrls, ExtractedWebSources
+from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedWebSources
 
 
 class LlmService:
@@ -25,7 +25,8 @@ class LlmService:
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
             # model_name="moonshotai/kimi-k2",
-            model_name="google/gemini-2.5-pro",
+            # model_name="google/gemini-2.5-pro",
+            model_name="openai/gpt-5-mini",
             temperature=0.2,
             rate_limiter=self.rate_limiter,
         )
@@ -52,13 +53,13 @@ class LlmService:
             strict=True,
         )
 
-    async def get_event_extraction_system_message(self, topic: TopicBase, language: str) -> str:
+    async def get_event_extraction_system_message(self, topic: TopicBase, language: str, publish_date: datetime.datetime) -> str:
         """Format the event extraction system message."""
         return await EVENT_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
-            topic_country=topic.country,
-            current_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            current_date=datetime.datetime.now(datetime.timezone.utc).strftime("%A, %d. of %B %Y"),
+            publish_date=publish_date.strftime("%A, %d. of %B %Y"),
             language=language,
         )
 
@@ -67,5 +68,4 @@ class LlmService:
         return await SOURCE_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
-            topic_country=topic.country,
         )
