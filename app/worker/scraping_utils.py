@@ -55,11 +55,7 @@ async def web_sources_from_scraping_source(
             else:
                 return await extract_sources_from_web(scraping_source, logger)
         case ScrapingSourceEnum.RSS:
-<<<<<<< HEAD
-            return await extract_sources_from_rss(scraping_source)
-=======
             return await extract_sources_from_rss(scraping_source, logger)
->>>>>>> 55ed622
         case _:
             raise ValueError(f"Unsupported source type: {scraping_source.source_type}")
 
@@ -232,7 +228,8 @@ async def extract_sources_from_rss(scraping_source: ScrapingSourceDB, logger: "L
         if source and source.date >= scraping_source.last_scraped_at:
             sources.append(source)
             logger.info(
-                "✅ Entry <cyan>{entry_id}</cyan> successfully downloaded, parsed and added to sources.", entry_id=entry.id
+                "✅ Entry <cyan>{entry_id}</cyan> successfully downloaded, parsed and added to sources.",
+                entry_id=entry.id,
             )
         else:
             logger.info(
@@ -258,10 +255,7 @@ async def download_and_parse_article(
     date_according_to_calling_func: datetime = None,
     prefer_own_publish_date: bool = True,
     degrees_of_separation: int = 0,
-<<<<<<< HEAD
-=======
     logger: "Logger" = None,
->>>>>>> 55ed622
 ) -> WebSourceWithMarkdown | None:
     """Download and parse an article from a URL, returning a WebSource object.
 
