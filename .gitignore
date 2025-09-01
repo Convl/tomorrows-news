@@ -4,6 +4,10 @@ CLAUDE.md
 .serena/
 .claude/
 notes.md
+app/debugging/
+app/discarded/
+app/tests/
+app/utils/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
