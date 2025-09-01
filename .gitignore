@@ -1,6 +1,9 @@
 # Custom
-README.md
 .playwright-mcp/
+CLAUDE.md
+.serena/
+.claude/
+notes.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
