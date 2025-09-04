@@ -17,8 +17,8 @@ class EventComparisonDB(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     # References to the compared events
-    extracted_event_id: Mapped[int] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=False)
-    event_id: Mapped[int] = mapped_column(Integer, ForeignKey("events.id"), nullable=False)
+    extracted_event_id: Mapped[int] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[int] = mapped_column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
 
     # Event data at time of comparison
     extracted_event_title: Mapped[str] = mapped_column(String(500), nullable=False)

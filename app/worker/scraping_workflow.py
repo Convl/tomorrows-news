@@ -25,6 +25,7 @@ from app.models import ScrapingSourceDB, TopicDB
 from app.models.event import EventDB
 from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
+from app.models.websource import WebSourceDB
 from app.schemas.topic import TopicBase
 
 from .llm_service import LlmService
@@ -433,7 +434,7 @@ class Scraper:
                 outdated=outdated,
             )
 
-            sources = await self.remove_duplicate_sources(sources, state.scraping_source)
+            sources = await self.deduplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
 
         except Exception as e:
@@ -455,14 +456,13 @@ class Scraper:
                 base_url=state.scraping_source.base_url,
             )
             sources = await web_sources_from_scraping_source(state.scraping_source, self.logger)
-            # sources = await self.remove_duplicate_sources(sources, state.scraping_source)
+            # sources = await self.deduplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
         else:
             return {}
 
-    async def remove_duplicate_sources(self, sources: list[WebSourceBase], scraping_source: ScrapingSourceDB):
+    async def deduplicate_sources(self, sources: list[WebSourceBase], scraping_source: ScrapingSourceDB):
         """Remove duplicate sources from the list."""
-        # TODO: Create separate table "sources" that sources get added to with url and date even if no events were extracted from them, use that for duplicate checking
         duplicates = 0
         async with get_db_session() as db:
             for i in range(len(sources) - 1, -1, -1):
@@ -481,18 +481,17 @@ class Scraper:
                 source.date = ExtractedEventDB.convert_date_to_utc(source.date)
                 if existing := (
                     await db.execute(
-                        select(ExtractedEventDB)
-                        .where(ExtractedEventDB.source_url == source.url)
-                        .where(ExtractedEventDB.source_published_date == source.date)
-                        .where(ExtractedEventDB.topic_id == scraping_source.topic_id)
+                        select(WebSourceDB)
+                        .where(WebSourceDB.url == source.url)
+                        .where(WebSourceDB.published_date == source.date)
+                        .where(WebSourceDB.topic_id == scraping_source.topic_id)
                     )
                 ).scalars().first():
                     self.logger.info(
-                        "❌ Dropping source {url} (<yellow>{date}</yellow>) as it is a duplicate to ExtractedEventDB <cyan>{id}</cyan> with title <cyan>{title}</cyan>",
+                        "❌ Dropping source {url} (<yellow>{date}</yellow>) as it is a duplicate to WebSourceDB <cyan>{id}</cyan>",
                         url=source.url,
                         date=source.date,
                         id=existing.id,
-                        title=existing.title,
                     )
                     duplicates += 1
                     sources.pop(i)
@@ -567,6 +566,17 @@ class Scraper:
                 total=total,
                 url=source.url,
             )
+
+            async with get_db_session() as db:
+                source_db = WebSourceDB(
+                    url=source.url,
+                    published_date=source.date,
+                    topic_id=state.scraping_source.topic.id,
+                )
+                db.add(source_db)
+                await db.flush()
+                await db.commit()
+
         except Exception as e:
             self.logger.error(
                 "❌ ERROR in extract_events_from_single_source for source <yellow>{current}</yellow>/<cyan>{total}</cyan>: {url}: <red>{e}</red>",

@@ -124,6 +124,24 @@
             }
         }
 
+        // Helper function to format time differences in a human-readable way
+        function formatTimeAgo(milliseconds) {
+            const seconds = Math.floor(Math.abs(milliseconds) / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) {
+                return `${days} day${days === 1 ? '' : 's'}`;
+            } else if (hours > 0) {
+                return `${hours} hour${hours === 1 ? '' : 's'}`;
+            } else if (minutes > 0) {
+                return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+            } else {
+                return `${seconds} second${seconds === 1 ? '' : 's'}`;
+            }
+        }
+
         // Sort state: default to date ascending
         const sortState = {
             field: 'date',      // 'date' or 'significance'
@@ -290,28 +308,51 @@
                     const iconMap = { 'Webpage': '🌐', 'Rss': '📡', 'Api': '🔗' };
                     const iconClass = s.source_type === 'Webpage' ? 'icon-web' : s.source_type === 'Rss' ? 'icon-rss' : 'icon-api';
 
-                    // Calculate status indicators
+                    // Calculate status indicators based on scraping schedule
                     const lastScrapedDate = s.last_scraped_at ? new Date(s.last_scraped_at) : null;
                     const now = new Date();
+                    const scrapingFrequencyMs = (s.scraping_frequency || 60) * 60 * 1000; // Convert minutes to milliseconds
                     let statusIndicator = '';
                     let statusClass = '';
+                    let statusDot = '';
 
-                    if (lastScrapedDate) {
-                        const minutesAgo = Math.floor((now - lastScrapedDate) / (1000 * 60));
-                        if (minutesAgo < 60) {
-                            statusIndicator = `🟢 Active • Last: ${minutesAgo}m ago`;
-                            statusClass = 'status-active';
-                        } else if (minutesAgo < 1440) { // 24 hours
-                            const hoursAgo = Math.floor(minutesAgo / 60);
-                            statusIndicator = `🟡 Recent • Last: ${hoursAgo}h ago`;
-                            statusClass = 'status-recent';
+                    if (lastScrapedDate && lastScrapedDate.getFullYear() > 1900) {
+                        const nextDueDate = new Date(lastScrapedDate.getTime() + scrapingFrequencyMs);
+                        const timeSinceLastScrape = now - lastScrapedDate;
+                        const timeUntilNextDue = nextDueDate - now;
+                        
+                        // Format last scraped time
+                        const lastScrapedFormatted = formatTimeAgo(timeSinceLastScrape);
+                        
+                        // Format next due time
+                        let nextDueFormatted;
+                        if (timeUntilNextDue > 0) {
+                            nextDueFormatted = `Due in ${formatTimeAgo(timeUntilNextDue)}`;
                         } else {
-                            const daysAgo = Math.floor(minutesAgo / 1440);
-                            statusIndicator = `🔴 Stale • Last: ${daysAgo}d ago`;
-                            statusClass = 'status-stale';
+                            nextDueFormatted = `Overdue by ${formatTimeAgo(Math.abs(timeUntilNextDue))}`;
+                        }
+
+                        // Check if currently scraping (this would need to be passed from backend, for now assume not)
+                        const isCurrentlyScraping = false; // TODO: Get this from backend
+                        
+                        if (isCurrentlyScraping) {
+                            statusDot = '🟡';
+                            statusIndicator = `Currently scraping • Last: ${lastScrapedFormatted} ago`;
+                            statusClass = 'status-scraping';
+                        } else if (timeUntilNextDue > 0) {
+                            // Not overdue - green dot
+                            statusDot = '🟢';
+                            statusIndicator = `Last: ${lastScrapedFormatted} ago • ${nextDueFormatted}`;
+                            statusClass = 'status-scheduled';
+                        } else {
+                            // Overdue - red dot
+                            statusDot = '🔴';
+                            statusIndicator = `Last: ${lastScrapedFormatted} ago • ${nextDueFormatted}`;
+                            statusClass = 'status-overdue';
                         }
                     } else {
-                        statusIndicator = '⚪ Never scraped';
+                        statusDot = '⚪';
+                        statusIndicator = 'Never scraped';
                         statusClass = 'status-never';
                     }
 
@@ -326,7 +367,7 @@
                                     <div class="d-flex align-items-center gap-2 mb-1">
                                         <span class="fw-semibold">${s.name}</span>
                                         <span class="badge text-bg-light">${s.source_type}</span>
-                                        <span class="feed-status ${statusClass}">${statusIndicator}</span>
+                                        <span class="feed-status ${statusClass}">${statusDot} ${statusIndicator}</span>
                                     </div>
                                     <div class="small text-secondary">${s.base_url}</div>
                                 </div>

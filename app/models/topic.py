@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.extracted_event import ExtractedEventDB
     from app.models.scraping_source import ScrapingSourceDB
     from app.models.user import UserDB
+    from app.models.websource import WebSourceDB
 
 
 class TopicDB(Base):
@@ -44,4 +45,7 @@ class TopicDB(Base):
     )
     scraping_sources: Mapped[List["ScrapingSourceDB"]] = relationship(
         "ScrapingSourceDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+    )
+    sources: Mapped[List["WebSourceDB"]] = relationship(
+        "WebSourceDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
     )

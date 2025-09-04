@@ -32,6 +32,3 @@ This project, to me, is really about the backend. For the frontend, I wanted to 
 - No build system, served statically
 - REST API integration
 
-- API docs: http://localhost:8000/api/v1/docs
-- Frontend: http://localhost:8000/app/
-- Health check: http://localhost:8000/health

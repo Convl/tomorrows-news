@@ -40,8 +40,9 @@ EVENT_MERGE_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
 You will be given the title and description of two events. 
 Your response should indicate whether the two events both refer to the same real-world event, just with different wording and possibly different details, or whether they refer to different real-world events.
-If they refer to different real-world events, leave the other fields in your response blank.
 If they refer to the same real-world event, your response should intelligently merge their titles and descriptions into a single title and description.
+If they refer to different real-world events, leave the other fields in your response blank.
+If one of the events refers to some specific part / subsection of the other event (e.g., the first event is about a rock festival, and the second event is about the much-anticipated return of some band as a headliner in that festival), you should consider them to refer to the same real-world-event, and your response should intelligently merge their titles and descriptions into a single title and description.
 When merging, try to preserve the most important information from both events.
 However, if there is contradictory information, you should prioritize the information from the second event.
 
