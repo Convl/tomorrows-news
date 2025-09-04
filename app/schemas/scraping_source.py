@@ -21,6 +21,7 @@ class ScrapingSourceBase(BaseModel):
     scraping_config: Dict[str, Any] | None = None
     scraping_frequency: int = Field(default=60000, ge=1440)  # Frequency in minutes, minimum 1440 = 1 days
     is_active: bool = True
+    currently_scraping: bool | None = None
 
 
 class ScrapingSourceCreate(ScrapingSourceBase):
@@ -44,6 +45,7 @@ class ScrapingSourceUpdate(BaseModel):
     scraping_config: Dict[str, Any] | None = None
     scraping_frequency: int | None = Field(None, ge=1)  # Frequency in minutes, minimum 1
     is_active: bool | None = None
+    currently_scraping: bool | None = None
 
 
 class ScrapingSourceResponse(ScrapingSourceBase):
@@ -52,6 +54,7 @@ class ScrapingSourceResponse(ScrapingSourceBase):
     id: int
     topic_id: int
     last_scraped_at: datetime | None = None
+    currently_scraping: bool | None = None
     created_at: datetime
     updated_at: datetime
 

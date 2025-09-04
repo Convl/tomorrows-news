@@ -188,7 +188,12 @@
                   <div class="flex-grow-1">
                     <h2 class="h5 mb-1">${t.name}</h2>
                     <div class="d-flex align-items-center gap-2 text-secondary small">
-                      <span>${t.description || ''}</span>
+                      <span>${t.description
+                        ? t.description.length > 55
+                            ? t.description.slice(0, 55) + '...'
+                            : t.description
+                        : ''
+                    }</span>
                       <span class="topic-stats" id="topic-stats-${t.id}"></span>
                     </div>
                   </div>
@@ -243,7 +248,7 @@
                         ⚙️ Options
                       </button>
                       <div class="form-check form-switch form-switch-compact">
-                        <input class="form-check-input" type="checkbox" id="events-expand-${t.id}" checked>
+                        <input class="form-check-input" type="checkbox" id="events-expand-${t.id}">
                         <label class="form-check-label" for="events-expand-${t.id}" title="Show or hide the list of events for this topic">Expand</label>
                       </div>
                     </div>
@@ -284,7 +289,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="collapse show" id="events-content-${t.id}">
+                <div class="collapse" id="events-content-${t.id}">
                   <div id="events-${t.id}"></div>
                   <div class="d-grid mt-3">
                     <button class="btn btn-outline-secondary btn-sm" id="show-more-${t.id}" title="Load additional events for this topic">Show more</button>
@@ -320,10 +325,10 @@
                         const nextDueDate = new Date(lastScrapedDate.getTime() + scrapingFrequencyMs);
                         const timeSinceLastScrape = now - lastScrapedDate;
                         const timeUntilNextDue = nextDueDate - now;
-                        
+
                         // Format last scraped time
                         const lastScrapedFormatted = formatTimeAgo(timeSinceLastScrape);
-                        
+
                         // Format next due time
                         let nextDueFormatted;
                         if (timeUntilNextDue > 0) {
@@ -332,9 +337,9 @@
                             nextDueFormatted = `Overdue by ${formatTimeAgo(Math.abs(timeUntilNextDue))}`;
                         }
 
-                        // Check if currently scraping (this would need to be passed from backend, for now assume not)
-                        const isCurrentlyScraping = false; // TODO: Get this from backend
-                        
+                        // Check if currently scraping from the backend data
+                        const isCurrentlyScraping = s.currently_scraping || false;
+
                         if (isCurrentlyScraping) {
                             statusDot = '🟡';
                             statusIndicator = `Currently scraping • Last: ${lastScrapedFormatted} ago`;
@@ -351,9 +356,16 @@
                             statusClass = 'status-overdue';
                         }
                     } else {
-                        statusDot = '⚪';
-                        statusIndicator = 'Never scraped';
-                        statusClass = 'status-never';
+                        const isCurrentlyScraping = s.currently_scraping || false;
+                        if (isCurrentlyScraping) {
+                            statusDot = '🟡';
+                            statusIndicator = 'Currently scraping • Last: never';
+                            statusClass = 'status-scraping';
+                        } else {
+                            statusDot = '⚪';
+                            statusIndicator = 'Never scraped';
+                            statusClass = 'status-never';
+                        }
                     }
 
                     const row = document.createElement('div');
@@ -526,10 +538,10 @@
                 eventsSwitch.onchange = () => {
                     if (eventsSwitch.checked) {
                         eventsContent.classList.add('show');
-                        eventsLabel.textContent = 'Expand';
+                        eventsLabel.textContent = 'Collapse';
                     } else {
                         eventsContent.classList.remove('show');
-                        eventsLabel.textContent = 'Collapse';
+                        eventsLabel.textContent = 'Expand';
                     }
                 };
 
@@ -890,7 +902,7 @@
                 if (eventsSwitch) {
                     eventsSwitch.checked = shouldExpand;
                     const eventsLabel = document.querySelector(`label[for="events-expand-${topicId}"]`);
-                    if (eventsLabel) eventsLabel.textContent = shouldExpand ? 'Expand' : 'Collapse';
+                    if (eventsLabel) eventsLabel.textContent = shouldExpand ? 'Collapse' : 'Expand';
                 }
             });
 

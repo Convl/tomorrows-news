@@ -2,12 +2,14 @@ from typing import List
 
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.auth import current_active_user
 from app.database import get_db
+from app.models.event import EventDB
+from app.models.extracted_event import ExtractedEventDB
 from app.models.scraping_source import ScrapingSourceDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
@@ -146,7 +148,7 @@ async def delete_scraping_source(
     current_user: UserDB = Depends(current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a scraping source"""
+    """Delete a scraping source and clean up orphaned events"""
     # Load and enforce ownership
     query = (
         select(ScrapingSourceDB)
@@ -159,6 +161,39 @@ async def delete_scraping_source(
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
 
+    # Get event IDs that may become orphaned after deletion
+    event_ids_query = (
+        select(ExtractedEventDB.event_id)
+        .where(
+            ExtractedEventDB.scraping_source_id == source_id,
+            ExtractedEventDB.event_id.isnot(None)
+        )
+        .distinct()
+    )
+    potentially_orphaned_event_ids = (await db.execute(event_ids_query)).scalars().all()
+
+    # Delete the scraping source (cascades to extracted_events)
     await db.delete(source)
+    await db.flush()  # Execute the delete but don't commit yet
+
+    # For each potentially orphaned event, check if it has any remaining extracted_events
+    # If not, delete the event
+    if potentially_orphaned_event_ids:
+        for event_id in potentially_orphaned_event_ids:
+            remaining_extracted_events = (
+                await db.execute(
+                    select(func.count(ExtractedEventDB.id))
+                    .where(ExtractedEventDB.event_id == event_id)
+                )
+            ).scalar()
+            
+            if remaining_extracted_events == 0:
+                # Delete the orphaned event
+                orphaned_event = (
+                    await db.execute(select(EventDB).where(EventDB.id == event_id))
+                ).scalars().first()
+                if orphaned_event:
+                    await db.delete(orphaned_event)
+
     await db.commit()
     return {"message": "Scraping source deleted successfully"}

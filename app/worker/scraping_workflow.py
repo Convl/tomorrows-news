@@ -466,7 +466,6 @@ class Scraper:
         duplicates = 0
         async with get_db_session() as db:
             for i in range(len(sources) - 1, -1, -1):
-                
                 source = sources[i]
 
                 if not isinstance(source.date, datetime.datetime):
@@ -479,14 +478,18 @@ class Scraper:
                     continue
 
                 source.date = ExtractedEventDB.convert_date_to_utc(source.date)
-                if existing := (
-                    await db.execute(
-                        select(WebSourceDB)
-                        .where(WebSourceDB.url == source.url)
-                        .where(WebSourceDB.published_date == source.date)
-                        .where(WebSourceDB.topic_id == scraping_source.topic_id)
+                if (
+                    existing := (
+                        await db.execute(
+                            select(WebSourceDB)
+                            .where(WebSourceDB.url == source.url)
+                            .where(WebSourceDB.published_date == source.date)
+                            .where(WebSourceDB.topic_id == scraping_source.topic_id)
+                        )
                     )
-                ).scalars().first():
+                    .scalars()
+                    .first()
+                ):
                     self.logger.info(
                         "❌ Dropping source {url} (<yellow>{date}</yellow>) as it is a duplicate to WebSourceDB <cyan>{id}</cyan>",
                         url=source.url,
@@ -679,6 +682,7 @@ class Scraper:
                 .one_or_none()
             )
             scraping_source.last_scraped_at = datetime.datetime.now(timezone.utc)
+            scraping_source.currently_scraping = False
             db.add(scraping_source)
             await db.commit()
             await db.refresh(scraping_source)
@@ -696,6 +700,10 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
+            scraping_source.currently_scraping = True
+            db.add(scraping_source)
+            await db.commit()
+            await db.refresh(scraping_source)
 
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 

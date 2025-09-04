@@ -1,6 +1,7 @@
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import datetime
 from sqlalchemy import create_engine
 
 from app.core.config import settings
@@ -27,4 +28,4 @@ job_defaults = {
     "misfire_grace_time": 691200,  # Allow jobs to be executed up to 8 days late
 }
 
-scheduler = AsyncIOScheduler(jobstores=jobstore, executors=executors, job_defaults=job_defaults)
+scheduler = AsyncIOScheduler(jobstores=jobstore, executors=executors, job_defaults=job_defaults, timezone=datetime.timezone.utc)

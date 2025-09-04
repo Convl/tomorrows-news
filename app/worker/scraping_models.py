@@ -9,13 +9,13 @@ from app.core.enums import ScrapingSourceEnum
 from app.schemas.topic import TopicBase
 
 
-
 class TopicWorkflow(BaseModel):
     """Topic model for use in workflow state - contains only fields needed for scraping"""
+
     id: int
     name: str
     description: str
-    country: str
+    country: str | None = None
     language: str | None = None
 
     class Config:
@@ -39,15 +39,20 @@ class ScrapingSourceWorkflow(BaseModel):
     class Config:
         from_attributes = True
 
+
 class WebSourceBase(BaseModel):
     """A web source (article, press release, etc.)"""
+
     url: str = Field(description="The full URL of the web source")
-    date: datetime | None = Field(default=None, description="The date when the source was published or last updated. Only set if you are certain.")
+    date: datetime | None = Field(
+        default=None, description="The date when the source was published or last updated. Only set if you are certain."
+    )
     title: str | None = Field(default=None, description="The headline or title of the source, if available")
 
 
 class WebSourceWithMetadata(WebSourceBase):
     """A web source (article, press release, etc.) containing metadata."""
+
     date: datetime = Field(description="The date when the source was published or last updated")
     _visited: bool = PrivateAttr(default=False)  # Whether the source has been visited for source extraction
     degrees_of_separation: int = Field(
@@ -73,6 +78,7 @@ class WebSourceWithMarkdown(WebSourceWithMetadata):
 
 class ExtractedWebSources(BaseModel):
     """Web sources extracted from content by LLM."""
+
     sources: list[WebSourceBase] = Field(description="A list of web sources extracted from the web source")
 
 

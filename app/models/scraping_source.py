@@ -45,6 +45,7 @@ class ScrapingSourceDB(Base):
     last_scraped_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=datetime.datetime(1900, 1, 1)
     )
+    currently_scraping: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
 
     # Topic relationship
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
@@ -89,6 +90,7 @@ class ScrapingSourceDB(Base):
                 trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 id=self.job_id,
                 jobstore=self.jobstore,
+                next_run_time=datetime.datetime.now(datetime.timezone.utc),
                 executor="scraping",  # Use the async executor
                 replace_existing=True,
             )

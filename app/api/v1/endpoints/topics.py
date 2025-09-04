@@ -117,7 +117,7 @@ async def update_topic(
 async def delete_topic(
     topic_id: int, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
 ):
-    """Delete a topic (only owner or admin)"""
+    """Delete a topic and all its related data (only owner or admin)"""
     query = select(TopicDB).where(TopicDB.id == topic_id)
 
     # If not superuser, restrict to user's own topics
@@ -128,6 +128,11 @@ async def delete_topic(
     if not topic:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
 
+    # Delete topic - cascade relationships will handle cleanup of:
+    # - EventDB records (cascade="all, delete-orphan")
+    # - ExtractedEventDB records (cascade="all, delete-orphan") 
+    # - ScrapingSourceDB records (cascade="all, delete-orphan")
+    # - WebSourceDB records (cascade="all, delete-orphan")
     await db.delete(topic)
     await db.commit()
     return {"message": "Topic deleted successfully"}

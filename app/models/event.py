@@ -30,11 +30,11 @@ class EventDB(Base):
     additional_infos: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
 
     # Provenance fields. Title and description may be composites. Location and duration are optional.
-    title_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
-    description_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
-    date_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
-    location_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
-    duration_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id"), nullable=True)
+    title_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
+    description_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
+    date_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
+    location_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
+    duration_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
 
     # Confidence
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
