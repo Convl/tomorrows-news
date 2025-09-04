@@ -66,6 +66,7 @@ class Settings(BaseSettings):
         "http://localhost:8000",
         "http://localhost:8001",
         "http://127.0.0.1:8000",
+        "https://*.azurewebsites.net",
     ]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
