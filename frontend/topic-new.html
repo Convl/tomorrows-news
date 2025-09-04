@@ -33,7 +33,7 @@
     <script type="module" src="/app/js/choices.js"></script>
     <script type="module">
         import { apiBase, authHeaders, getToken } from '/app/js/config.js';
-        import { populateSelect, fetchCountryOptions } from '/app/js/choices.js';
+        import { populateSelect } from '/app/js/choices.js';
         const alertEl = document.getElementById('alert');
         if (!getToken()) { window.location.href = '/app/login.html'; }
         const formRoot = document.getElementById('form');
@@ -46,24 +46,16 @@
               <label class="form-label" for="description">📄 Description</label>
               <textarea class="form-control" id="description" rows="4" placeholder="Describe what kinds of events you are interested in..."></textarea>
             </div>
-            <div class="mb-4">
-              <label class="form-label" for="country">🌍 Country</label>
-              <select class="form-select" id="country"></select>
-            </div>
         `;
         const submitBtn = document.getElementById('submit');
         async function init() {
-            // Populate country dropdown
-            populateSelect(document.getElementById('country'), await fetchCountryOptions(true), '');
+            // No initialization needed
         }
         submitBtn.onclick = async () => {
             alertEl.className = 'alert d-none';
-            const countryEl = document.getElementById('country');
             const payload = {
                 name: document.getElementById('name').value.trim(),
                 description: document.getElementById('description').value.trim() || null,
-                country: countryEl.options[countryEl.selectedIndex]?.dataset?.name || (countryEl.value || null),
-                country_code: countryEl.value || null,
                 is_active: true, // Always set to active
             };
             if (!payload.name) {

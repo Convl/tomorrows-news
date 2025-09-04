@@ -67,16 +67,23 @@
             <div class="row g-3 mb-4">
               <div class="col-md-6">
                 <label class="form-label" for="degrees_of_separation">🔗 Degrees of separation</label>
-                <input class="form-control" id="degrees_of_separation" type="number" min="0" max="2" value="1" />
+                <select class="form-select" id="degrees_of_separation">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency (minutes)</label>
-                <input class="form-control" id="scraping_frequency" type="number" min="1440" value="1440" />
+                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency</label>
+                <div class="input-group">
+                  <input class="form-control" id="scraping_frequency" type="number" min="1" value="1" />
+                  <select class="form-select" id="frequency_unit" style="max-width: 120px;">
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days" selected>Days</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="is_active" checked />
-              <label class="form-check-label fw-medium" for="is_active">Active</label>
             </div>
         `;
         const submitBtn = document.getElementById('submit');
@@ -101,8 +108,15 @@
                 language_code: languageEl.value || null,
                 description: document.getElementById('description').value.trim() || null,
                 degrees_of_separation: parseInt(document.getElementById('degrees_of_separation').value, 10) || 0,
-                scraping_frequency: parseInt(document.getElementById('scraping_frequency').value, 10) || 60000,
-                is_active: document.getElementById('is_active').checked,
+                scraping_frequency: (() => {
+                    const freq = parseInt(document.getElementById('scraping_frequency').value, 10) || 1;
+                    const unit = document.getElementById('frequency_unit').value;
+                    if (unit === 'minutes') return freq;
+                    if (unit === 'hours') return freq * 60;
+                    if (unit === 'days') return freq * 1440;
+                    return freq;
+                })(),
+                is_active: true,
                 topic_id: topicId,
             };
             if (!payload.name || !payload.base_url || !payload.source_type) {

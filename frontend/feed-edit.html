@@ -70,16 +70,23 @@
             <div class="row g-3 mb-4">
               <div class="col-md-6">
                 <label class="form-label" for="degrees_of_separation">🔗 Degrees of separation</label>
-                <input class="form-control" id="degrees_of_separation" type="number" min="0" max="2" />
+                <select class="form-select" id="degrees_of_separation">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency (minutes)</label>
-                <input class="form-control" id="scraping_frequency" type="number" min="1440" />
+                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency</label>
+                <div class="input-group">
+                  <input class="form-control" id="scraping_frequency" type="number" min="1" />
+                  <select class="form-select" id="frequency_unit" style="max-width: 120px;">
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="is_active" />
-              <label class="form-check-label fw-medium" for="is_active">✅ Active</label>
             </div>
         `;
         const saveBtn = document.getElementById('save');
@@ -95,8 +102,21 @@
             document.getElementById('base_url').value = original.base_url || '';
             document.getElementById('description').value = original.description || '';
             document.getElementById('degrees_of_separation').value = original.degrees_of_separation ?? 0;
-            document.getElementById('scraping_frequency').value = original.scraping_frequency ?? 60000;
-            document.getElementById('is_active').checked = !!original.is_active;
+            // Set scraping frequency and unit based on original value in minutes
+            const freqInMinutes = original.scraping_frequency ?? 1440;
+            let freq, unit;
+            if (freqInMinutes >= 1440 && freqInMinutes % 1440 === 0) {
+                freq = freqInMinutes / 1440;
+                unit = 'days';
+            } else if (freqInMinutes >= 60 && freqInMinutes % 60 === 0) {
+                freq = freqInMinutes / 60;
+                unit = 'hours';
+            } else {
+                freq = freqInMinutes;
+                unit = 'minutes';
+            }
+            document.getElementById('scraping_frequency').value = freq;
+            document.getElementById('frequency_unit').value = unit;
         }
         function computePatch() {
             const countryEl = document.getElementById('country');
@@ -111,8 +131,14 @@
                 language_code: languageEl.value || null,
                 description: document.getElementById('description').value.trim() || null,
                 degrees_of_separation: parseInt(document.getElementById('degrees_of_separation').value, 10),
-                scraping_frequency: parseInt(document.getElementById('scraping_frequency').value, 10),
-                is_active: document.getElementById('is_active').checked,
+                scraping_frequency: (() => {
+                    const freq = parseInt(document.getElementById('scraping_frequency').value, 10) || 1;
+                    const unit = document.getElementById('frequency_unit').value;
+                    if (unit === 'minutes') return freq;
+                    if (unit === 'hours') return freq * 60;
+                    if (unit === 'days') return freq * 1440;
+                    return freq;
+                })(),
             };
             const patch = {};
             for (const [k, v] of Object.entries(current)) {
