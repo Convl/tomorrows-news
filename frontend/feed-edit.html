@@ -6,7 +6,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Edit Feed • Tomorrow's News</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <link href="/app/assets/theme.css" rel="stylesheet" />
+    <style>
+        .custom-tooltip {
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.4;
+            max-width: 400px;
+            z-index: 1050;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            white-space: pre-line;
+            display: none;
+        }
+        .custom-tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border: 5px solid transparent;
+            border-top-color: #333;
+        }
+        .tooltip-trigger {
+            position: relative;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
@@ -42,34 +71,42 @@
         const formRoot = document.getElementById('form');
         formRoot.innerHTML = `
             <div class="mb-4">
-              <label class="form-label" for="name">📝 Name</label>
+              <label class="form-label" for="name">📝 Name 
+                <span class="text-info ms-1 tooltip-trigger" data-tooltip="Source name, e.g. 'Presseschau der LTO', 'Politikressort der F.A.Z.', 'Pressemitteilungen des Bundesgerichtshofs'" style="cursor: help;">ℹ️</span>
+              </label>
               <input class="form-control" id="name" placeholder="Enter source name..." />
             </div>
             <div class="mb-4">
-              <label class="form-label" for="base_url">🔗 Base URL</label>
+              <label class="form-label" for="base_url">🔗 Base URL 
+                <span class="text-info ms-1 tooltip-trigger" data-tooltip="Webpage or RSS feed URL that will contain the news, e.g. https://www.bundesgerichtshof.de/DE/Presse/Pressemitteilungen/pressemitteilungen_node.html, https://www.lto.de/presseschau-rss/rss/feed.xml" style="cursor: help;">ℹ️</span>
+              </label>
               <input class="form-control" id="base_url" type="url" placeholder="https://example.com" />
             </div>
             <div class="mb-4">
-              <label class="form-label" for="source_type">🔧 Source Type</label>
+              <label class="form-label" for="source_type">🔧 Source Type 
+                <span class="text-info ms-1 tooltip-trigger" data-tooltip="Whether the base url you provided points to a web page like https://www.lto.de/recht/presseschau or a Rss feed like https://www.lto.de/presseschau-rss/rss/feed.xml or a REST Api (coming soon)" style="cursor: help;">ℹ️</span>
+              </label>
               <select class="form-select" id="source_type"></select>
             </div>
             <div class="row g-3 mb-4">
               <div class="col-md-6">
-                <label class="form-label" for="country">🌍 Country</label>
+                <label class="form-label" for="country">🌍 Country 
+                  <span class="text-info ms-1 tooltip-trigger" data-tooltip="The country where this feed resides, e.g. &quot;United States&quot; for the New York Times, or &quot;Germany&quot; for the F.A.Z." style="cursor: help;">ℹ️</span>
+                </label>
                 <select class="form-select" id="country"></select>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="language">🗣️ Language</label>
+                <label class="form-label" for="language">🗣️ Language 
+                  <span class="text-info ms-1 tooltip-trigger" data-tooltip="The language in which events extracted from this feed should appear. This should typically be the same language that is used by the feed itself, and correspond to the feed's country, i.e. &quot;English (en)&quot; for the New York Times or &quot;German (de)&quot; for the F.A.Z." style="cursor: help;">ℹ️</span>
+                </label>
                 <select class="form-select" id="language"></select>
               </div>
             </div>
-            <div class="mb-4">
-              <label class="form-label" for="description">📄 Description</label>
-              <textarea class="form-control" id="description" rows="3" placeholder="Describe this source..."></textarea>
-            </div>
             <div class="row g-3 mb-4">
               <div class="col-md-6">
-                <label class="form-label" for="degrees_of_separation">🔗 Degrees of separation</label>
+                <label class="form-label" for="degrees_of_separation">🔗 Degrees of separation 
+                  <span class="text-info ms-1 tooltip-trigger" data-tooltip="Where information about upcoming events is expected to be found, relative to the base url.\n1 = News content found DIRECTLY ON THE BASE URL, such as with a long-running liveblog. This option is rare / exotic\n2 = News content LINKED TO FROM THE BASE URL, such as with the base url or specific subsections (politics, business, etc) of any online news outlet. This option is by far the most common\n3 = News content LINKED TO FROM THE BASE URL, but contains further links, which must also be scraped. Use this option for press reviews or similar types of curated overviews, e.g. https://www.lto.de/recht/presseschau" style="cursor: help;">ℹ️</span>
+                </label>
                 <select class="form-select" id="degrees_of_separation">
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -77,7 +114,9 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency</label>
+                <label class="form-label" for="scraping_frequency">⏱️ Scraping frequency 
+                  <span class="text-info ms-1 tooltip-trigger" data-tooltip="How often this feed shall be scraped for new events (minimum: 1 day / 24 hours / 1440 minutes)" style="cursor: help;">ℹ️</span>
+                </label>
                 <div class="input-group">
                   <input class="form-control" id="scraping_frequency" type="number" min="1" />
                   <select class="form-select" id="frequency_unit" style="max-width: 120px;">
@@ -100,7 +139,6 @@
             populateSelect(document.getElementById('source_type'), await fetchSourceTypeOptions(), original.source_type || '');
             document.getElementById('name').value = original.name || '';
             document.getElementById('base_url').value = original.base_url || '';
-            document.getElementById('description').value = original.description || '';
             document.getElementById('degrees_of_separation').value = original.degrees_of_separation ?? 0;
             // Set scraping frequency and unit based on original value in minutes
             const freqInMinutes = original.scraping_frequency ?? 1440;
@@ -117,6 +155,9 @@
             }
             document.getElementById('scraping_frequency').value = freq;
             document.getElementById('frequency_unit').value = unit;
+            
+            // Initialize custom tooltips
+            initCustomTooltips();
         }
         function computePatch() {
             const countryEl = document.getElementById('country');
@@ -129,7 +170,6 @@
                 country_code: countryEl.value || null,
                 language: languageEl.options[languageEl.selectedIndex]?.dataset?.name || (languageEl.value || null),
                 language_code: languageEl.value || null,
-                description: document.getElementById('description').value.trim() || null,
                 degrees_of_separation: parseInt(document.getElementById('degrees_of_separation').value, 10),
                 scraping_frequency: (() => {
                     const freq = parseInt(document.getElementById('scraping_frequency').value, 10) || 1;
@@ -198,6 +238,41 @@
         };
 
         init();
+        
+        // Custom tooltip functionality
+        function initCustomTooltips() {
+            const tooltipTriggers = document.querySelectorAll('.tooltip-trigger');
+            let currentTooltip = null;
+            
+            tooltipTriggers.forEach(trigger => {
+                trigger.addEventListener('mouseenter', function(e) {
+                    // Remove any existing tooltip
+                    if (currentTooltip) {
+                        currentTooltip.remove();
+                    }
+                    
+                    // Create new tooltip
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'custom-tooltip';
+                    tooltip.textContent = this.getAttribute('data-tooltip');
+                    document.body.appendChild(tooltip);
+                    currentTooltip = tooltip;
+                    
+                    // Position tooltip
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                    tooltip.style.display = 'block';
+                });
+                
+                trigger.addEventListener('mouseleave', function() {
+                    if (currentTooltip) {
+                        currentTooltip.remove();
+                        currentTooltip = null;
+                    }
+                });
+            });
+        }
     </script>
 </body>
 

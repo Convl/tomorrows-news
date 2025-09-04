@@ -96,21 +96,22 @@ async def dbg():
     from app.models import ScrapingSourceDB
     from app.worker.scheduler import scheduler
 
-    async with get_db_session() as db:
-        sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()
-        for source in sources:
-            source.last_scraped_at = datetime.now(timezone.utc) - timedelta(days=3)
-            db.add(source)
-            print(f"Set last_scraped_at for source {source.id} to {source.last_scraped_at}")
-        await db.commit()
+    # async with get_db_session() as db:
+    #     sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()
+    #     for source in sources:
+    #         source.last_scraped_at = datetime.now(timezone.utc) - timedelta(days=3)
+    #         db.add(source)
+    #         print(f"Set last_scraped_at for source {source.id} to {source.last_scraped_at}")
+    #     await db.commit()
 
-    from app.worker.scraper import Scraper
-    scraper = Scraper(source_id)
-    await scraper.scrape()
+    # from app.worker.scraper import Scraper
+    # scraper = Scraper(source_id)
+    # await scraper.scrape()
 
-    # for i, job in enumerate(scheduler.get_jobs()):
-    #     scheduler.modify_job(job.id, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20 * i))
-    #     print(f"Rescheduled job {i}: {job.id} to {datetime.now(timezone.utc) + timedelta(seconds=20 * i)}")
+    for i, job in enumerate(scheduler.get_jobs()):
+        print(f"Job with id {job.id} will run at {job.next_run_time}")
+        # scheduler.modify_job(job.id, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20 * i))
+        # print(f"Rescheduled job {i}: {job.id} to {datetime.now(timezone.utc) + timedelta(seconds=20 * i)}")
 
 
 if __name__ == "__main__":
