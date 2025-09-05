@@ -15,7 +15,7 @@ function __shouldBypass401(url) {
         const href = typeof url === 'string' ? url : (url?.url || '');
         if (href.includes('/auth/jwt/login')) return true;
     } catch { }
-    if (window.location && window.location.pathname.endsWith('/app/login.html')) return true;
+    if (window.location && window.location.pathname.endsWith('auth/login.html')) return true;
     return false;
 }
 
@@ -23,7 +23,7 @@ export async function authedFetch(input, init) {
     const resp = await __originalFetch(input, init);
     if (resp && resp.status === 401 && !__shouldBypass401(input)) {
         clearToken();
-        try { window.location.href = '/app/login.html'; } catch { }
+        try { window.location.href = 'auth/login.html'; } catch { }
     }
     return resp;
 }

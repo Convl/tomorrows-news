@@ -13,7 +13,7 @@ from .scraping_models import EventMergeResponse, ExtractedBaseEvents, ExtractedW
 class LlmService:
     """Handles LLM initialization and prompt formatting for scraping operations."""
 
-    def __init__(self):
+    def __init__(self, is_demo_user: bool = False):
         # Setup rate limiter and LLM
         self.rate_limiter = InMemoryRateLimiter(
             requests_per_second=1,
@@ -21,12 +21,13 @@ class LlmService:
             max_bucket_size=1,
         )
 
+        model_name = "openai/gpt-5" if is_demo_user else "openai/gpt-5-mini"
         self.llm = ChatOpenAI(
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
             # model_name="moonshotai/kimi-k2",
             # model_name="google/gemini-2.5-pro",
-            model_name="openai/gpt-5-mini",
+            model_name=model_name,
             temperature=0.2,
             rate_limiter=self.rate_limiter,
         )

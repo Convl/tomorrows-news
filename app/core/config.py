@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     PROJECT_EMAIL_PORT: int
     PROJECT_EMAIL_HOST: str
 
+    DEMO_USER_EMAIL: str
+
     JWT_SECRET: SecretStr
 
     # API settings

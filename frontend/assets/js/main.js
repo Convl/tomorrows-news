@@ -4,7 +4,7 @@
 class ApiClient {
     constructor() {
         this.baseURL = '/api/v1';
-        this.token = localStorage.getItem('authToken');
+        this.token = localStorage.getItem('tn_token');
     }
 
     async request(endpoint, options = {}) {
@@ -78,12 +78,12 @@ class ApiClient {
 
     setToken(token) {
         this.token = token;
-        localStorage.setItem('authToken', token);
+        localStorage.setItem('tn_token', token);
     }
 
     logout() {
         this.token = null;
-        localStorage.removeItem('authToken');
+        localStorage.removeItem('tn_token');
         navigateTo('auth/login.html');
     }
 

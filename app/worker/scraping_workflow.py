@@ -21,7 +21,7 @@ from sqlalchemy.orm import QueryableAttribute, selectinload
 from app.core.config import settings
 from app.core.enums import ScrapingSourceEnum
 from app.database import get_db_session
-from app.models import ScrapingSourceDB, TopicDB
+from app.models import ScrapingSourceDB, TopicDB, UserDB
 from app.models.event import EventDB
 from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
@@ -455,7 +455,7 @@ class Scraper:
                 id=state.scraping_source.id,
                 base_url=state.scraping_source.base_url,
             )
-            sources = await web_sources_from_scraping_source(state.scraping_source, self.logger)
+            sources = await web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service)
             # sources = await self.deduplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
         else:
@@ -705,10 +705,15 @@ class Scraper:
             await db.commit()
             await db.refresh(scraping_source)
 
+            current_topic = (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
+            current_user = (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
+            is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
+
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 
         # Initialize LLM service
-        self.llm_service = LlmService()
+        
+        self.llm_service = LlmService(is_demo_user=is_demo_user)
 
         # This message, unlike the one for event extraction, is static, so we can create it here
         self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(

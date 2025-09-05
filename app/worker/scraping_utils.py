@@ -12,24 +12,14 @@ from newspaper import Article, Config
 from app.core.enums import ScrapingSourceEnum
 from app.models.scraping_source import ScrapingSourceDB
 
-from .llm_service import LlmService
+
 from .scraping_models import ExtractedWebSources, ScrapingSourceWorkflow, WebSourceBase, WebSourceWithMarkdown
 
 if TYPE_CHECKING:
     from loguru import Logger
+    from .llm_service import LlmService
 
 MIN_ENTRIES_TO_CONSIDER_VALID_LISTING = 8
-
-# Module-level LLM service instance that can be used by functions
-_llm_service = None
-
-
-async def get_llm_service() -> LlmService:
-    """Get or create the module-level LLM service instance."""
-    global _llm_service
-    if _llm_service is None:
-        _llm_service = LlmService()
-    return _llm_service
 
 
 def struct_time_to_datetime(struct_time_obj) -> datetime | None:
@@ -45,7 +35,7 @@ def struct_time_to_datetime(struct_time_obj) -> datetime | None:
 
 
 async def web_sources_from_scraping_source(
-    scraping_source: ScrapingSourceWorkflow, logger: "Logger"
+    scraping_source: ScrapingSourceWorkflow, logger: "Logger", llm_service: LlmService
 ) -> list[WebSourceWithMarkdown]:
     scraping_source._visited = True
     match scraping_source.source_type:
@@ -53,7 +43,7 @@ async def web_sources_from_scraping_source(
             if scraping_source.degrees_of_separation == 0:
                 return [await download_and_parse_article(scraping_source.base_url, logger=logger)]
             else:
-                return await extract_sources_from_web(scraping_source, logger)
+                return await extract_sources_from_web(scraping_source, logger, llm_service)
         case ScrapingSourceEnum.RSS:
             return await extract_sources_from_rss(scraping_source, logger)
         case _:
@@ -61,7 +51,7 @@ async def web_sources_from_scraping_source(
 
 
 async def extract_sources_from_web(
-    scraping_source: ScrapingSourceWorkflow, logger: "Logger"
+    scraping_source: ScrapingSourceWorkflow, logger: "Logger", llm_service: LlmService
 ) -> list[WebSourceWithMarkdown]:
     """Extract sources from a website, using newspaper if possible, LLM-assisted if not."""
     sources = []
@@ -80,8 +70,6 @@ async def extract_sources_from_web(
         await asyncio.to_thread(website.parse)
 
         markdown = markdownify(choose_input_for_markdownify(website.article_html, website.html, logger))
-
-        llm_service = await get_llm_service()
 
         # Let LLM extract sources from the page
         messages = [
