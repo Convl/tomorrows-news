@@ -686,6 +686,7 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
+
             scraping_source.last_scraped_at = datetime.datetime.now(timezone.utc)
             scraping_source.currently_scraping = False
             db.add(scraping_source)
@@ -705,6 +706,9 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
+            if scraping_source.currently_scraping:
+                raise Exception("Scraping source is currently scraping")
+
             scraping_source.currently_scraping = True
             db.add(scraping_source)
             await db.commit()
