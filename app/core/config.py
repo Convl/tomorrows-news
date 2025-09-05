@@ -85,8 +85,16 @@ class Settings(BaseSettings):
 
     TAVILY_API_KEY: SecretStr
 
-    # Frontend URL for email links
-    FRONTEND_URL: str = "http://localhost:8000/frontend"
+    @property
+    def FRONTEND_URL(self) -> str:
+        """Auto-detect frontend URL based on environment"""
+        import os
+
+        # Azure App Service provides WEBSITE_HOSTNAME
+        if hostname := os.getenv("WEBSITE_HOSTNAME"):
+            return f"https://{hostname}/frontend"
+        # Fallback to configured URL (local development)
+        return "http://localhost:8000/frontend"
 
     class Config:
         env_file = ".env"
