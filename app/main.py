@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from rich.traceback import install
-from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -46,9 +45,6 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Serve static files (frontend)
 app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
-
-# Mount static frontend at /app
-app.mount("/app", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 @app.get("/")
