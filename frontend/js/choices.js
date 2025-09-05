@@ -16,7 +16,7 @@ const LANGUAGE_NAME_BY_CODE = {
 };
 export async function fetchCountryOptions(includeBlank = true) {
     try {
-        const response = await fetch('/app/js/countries.json', { cache: 'no-store' });
+        const response = await fetch('/frontend/js/countries.json', { cache: 'no-store' });
         if (!response.ok) throw new Error('countries fetch failed');
         const data = await response.json();
         const options = (Array.isArray(data) ? data : [])
@@ -41,7 +41,7 @@ export async function fetchCountryOptions(includeBlank = true) {
 
 export async function fetchLanguageOptions(includeBlank = true) {
     try {
-        const response = await fetch('/app/js/languages.json', { cache: 'no-store' });
+        const response = await fetch('/frontend/js/languages.json', { cache: 'no-store' });
         if (!response.ok) throw new Error('languages fetch failed');
         const data = await response.json();
         const options = (Array.isArray(data) ? data : [])

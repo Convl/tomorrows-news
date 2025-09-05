@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 
 MIN_ENTRIES_TO_CONSIDER_VALID_LISTING = 8
+MIN_ARTICLE_LENGTH = 1000
+MAX_ARTICLE_LENGTH = 30000
 
 
 def struct_time_to_datetime(struct_time_obj) -> datetime | None:
@@ -157,13 +159,12 @@ def extract_main_content_by_ratio(raw_html: str) -> str | None:
         memo = {}
         best_element = None
         best_score = 0
-        min_text_length = 1000
         
         for leaf_element in leaf_text_elements:
             optimal_element, score = find_optimal_ancestor(leaf_element, memo)
             text_length = len(optimal_element.get_text(strip=True))
             
-            if text_length >= min_text_length and score > best_score:
+            if text_length >= MIN_ARTICLE_LENGTH and score > best_score:
                 best_score = score
                 best_element = optimal_element
         
@@ -347,7 +348,7 @@ def _is_article_html_good_quality(article_html: str) -> bool:
         text_content = soup.get_text(strip=True)
         
         # Basic length checks
-        if len(text_content) < 1000 or len(text_content) > 30000:
+        if len(text_content) < MIN_ARTICLE_LENGTH or len(text_content) > MAX_ARTICLE_LENGTH:
             return False
         
         # Check text-to-markup ratio
@@ -362,7 +363,7 @@ def _is_article_html_good_quality(article_html: str) -> bool:
     except Exception:
         # If BeautifulSoup parsing fails, fall back to basic checks
         article_len = len(article_html.strip())
-        return 1000 <= article_len <= 30000
+        return MIN_ARTICLE_LENGTH <= article_len <= MAX_ARTICLE_LENGTH
 
 
 async def extract_sources_from_rss(scraping_source: ScrapingSourceDB, logger: "Logger") -> list[WebSourceWithMarkdown]:
