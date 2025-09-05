@@ -30,7 +30,8 @@ Examples of events that are NOT sufficiently specific or important:
 SOURCE_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
 You will be given a markdown-converted webpage by the user that should contain a news article, a blog post, a press release, or a similar piece of substantive content. Note that it may also contain other elements from the webpage that the content was hosted on, such as navigational elements, links and teasers for other articles, advertisements, etc. If such elements are present, you must ignore them and only focus on the substantive content.
-If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
+If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage). If the links are relative links, you should convert them to absolute links, by prepending the base URL of the webpage. 
+The base URL is: {base_url}
 Topic name: {topic_name}
 Topic description: {topic_description}
 """

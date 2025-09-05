@@ -12,11 +12,11 @@ def build_api_url(endpoint: str) -> str:
     """Build a complete Frontend URL to the correct static page with token preserved."""
     # endpoint examples: "verify?token=..." or "reset-password?token=..."
     if endpoint.startswith("verify?"):
-        return f"{settings.FRONTEND_URL}/app/verify.html{endpoint[len('verify') :]}"
+        return f"{settings.FRONTEND_URL}/frontend/verify.html{endpoint[len('verify') :]}"
     if endpoint.startswith("reset-password?"):
-        return f"{settings.FRONTEND_URL}/app/reset-password.html{endpoint[len('reset-password') :]}"
+        return f"{settings.FRONTEND_URL}/frontend/reset-password.html{endpoint[len('reset-password') :]}"
     # Fallback
-    return f"{settings.FRONTEND_URL}/app/{endpoint}"
+    return f"{settings.FRONTEND_URL}/frontend/{endpoint}"
 
 
 class EmailService:

@@ -64,9 +64,10 @@ class LlmService:
             language=language,
         )
 
-    async def get_source_extraction_system_message(self, topic: TopicBase) -> str:
+    async def get_source_extraction_system_message(self, topic: TopicBase, base_url: str) -> str:
         """Format the source extraction system message."""
         return await SOURCE_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
             topic_description=topic.description,
+            base_url=base_url,
         )

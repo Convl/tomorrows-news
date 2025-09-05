@@ -379,8 +379,13 @@ class Scraper:
 
             source._visited = True
 
+            source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
+                topic=state.scraping_source.topic,
+                base_url=source.url,
+            )
+
             messages = [
-                self.source_extraction_system_message,
+                source_extraction_system_message,
                 HumanMessage(f"Extract sources from the following webpage: {source.markdown}"),
             ]
             response = await self.llm_service.source_extracting_llm.ainvoke(messages)
@@ -705,20 +710,19 @@ class Scraper:
             await db.commit()
             await db.refresh(scraping_source)
 
-            current_topic = (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
-            current_user = (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
+            current_topic = (
+                (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
+            )
+            current_user = (
+                (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
+            )
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
 
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 
         # Initialize LLM service
-        
-        self.llm_service = LlmService(is_demo_user=is_demo_user)
 
-        # This message, unlike the one for event extraction, is static, so we can create it here
-        self.source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
-            scraping_source_workflow.topic
-        )
+        self.llm_service = LlmService(is_demo_user=is_demo_user)
 
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()

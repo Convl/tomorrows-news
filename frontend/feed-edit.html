@@ -61,11 +61,11 @@
     </div>
   </main>
 
-  <script type="module" src="/app/js/config.js"></script>
-  <script type="module" src="/app/js/choices.js"></script>
+  <script type="module" src="/frontend/js/config.js"></script>
+  <script type="module" src="/frontend/js/choices.js"></script>
   <script type="module">
-    import { apiBase, authHeaders, getToken } from '/app/js/config.js';
-    import { fetchCountryOptions, fetchLanguageOptions, fetchSourceTypeOptions, populateSelect } from '/app/js/choices.js';
+    import { apiBase, authHeaders, getToken } from '/frontend/js/config.js';
+    import { fetchCountryOptions, fetchLanguageOptions, fetchSourceTypeOptions, populateSelect } from '/frontend/js/choices.js';
     const alertEl = document.getElementById('alert');
     if (!getToken()) { window.location.href = 'auth/login.html'; }
     const params = new URLSearchParams(window.location.search);
@@ -190,16 +190,16 @@
     }
     saveBtn.onclick = async () => {
       alertEl.className = 'alert d-none';
-      
+
       // Disable button and show loading state
       saveBtn.disabled = true;
       saveBtn.textContent = '⏳ Saving Changes...';
-      
+
       const patch = computePatch();
       try {
         const resp = await fetch(`${apiBase}/scraping-sources/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(patch) });
         if (!resp.ok) throw new Error('Failed to save changes');
-        window.location.href = '/app/dashboard.html';
+        window.location.href = '/frontend/dashboard.html';
       } catch (err) {
         alertEl.textContent = err.message || 'Failed to save changes';
         alertEl.className = 'alert alert-danger';
@@ -236,7 +236,7 @@
         alertEl.className = 'alert alert-success';
 
         setTimeout(() => {
-          window.location.href = '/app/dashboard.html';
+          window.location.href = '/frontend/dashboard.html';
         }, 1500);
 
       } catch (err) {
