@@ -375,7 +375,7 @@ class Scraper:
         domain = urlparse(url).netloc
         async with self.domain_semaphores[domain]:
             return await download_and_parse_article(url, *args, **kwargs)
-            
+
     async def extract_sources_from_single_source(
         self, data: dict[str, WebSourceWithMarkdown | ScrapingState | int | int]
     ) -> dict[str, list[WebSourceWithMarkdown] | list]:

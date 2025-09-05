@@ -21,7 +21,8 @@ class LlmService:
             max_bucket_size=1,
         )
 
-        model_name = "openai/gpt-5" if is_demo_user else "openai/gpt-5-mini"
+        model_name = "google/gemini-2.5-pro" if is_demo_user else "openai/gpt-5-mini"
+
         self.llm = ChatOpenAI(
             openai_api_key=settings.OPENROUTER_API_KEY,
             openai_api_base=settings.OPENROUTER_BASE_URL,
@@ -54,7 +55,9 @@ class LlmService:
             strict=True,
         )
 
-    async def get_event_extraction_system_message(self, topic: TopicBase, language: str, publish_date: datetime.datetime) -> str:
+    async def get_event_extraction_system_message(
+        self, topic: TopicBase, language: str, publish_date: datetime.datetime
+    ) -> str:
         """Format the event extraction system message."""
         return await EVENT_EXTRACTION_SYSTEM_TEMPLATE.aformat(
             topic_name=topic.name,
