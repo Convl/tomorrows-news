@@ -1,8 +1,10 @@
 import asyncio
 import datetime
 import json
+from collections import defaultdict
 from datetime import timedelta, timezone
 from pprint import pprint
+from urllib.parse import urlparse
 
 from langchain_core.messages import HumanMessage
 from langchain_openai import OpenAIEmbeddings
@@ -52,6 +54,9 @@ CONSIDER_NEW_LOCATION_TRUE_THRESHOLD = 3
 
 
 class Scraper:
+    # Class-level domain semaphores for rate limiting
+    domain_semaphores = defaultdict(lambda: asyncio.Semaphore(2))  # 2 concurrent requests per domain
+
     def __init__(self, source_id):
         self.sources = []
         self.scraping_source_id = source_id
@@ -365,6 +370,12 @@ class Scraper:
                 await db.flush()
                 await db.commit()
 
+    async def domain_limited_download(self, url, *args, **kwargs):
+        """Download article with domain-based rate limiting."""
+        domain = urlparse(url).netloc
+        async with self.domain_semaphores[domain]:
+            return await download_and_parse_article(url, *args, **kwargs)
+            
     async def extract_sources_from_single_source(
         self, data: dict[str, WebSourceWithMarkdown | ScrapingState | int | int]
     ) -> dict[str, list[WebSourceWithMarkdown] | list]:
@@ -406,7 +417,7 @@ class Scraper:
             #         sources.append(new_source)
             tasks = []
             for extracted_source in extracted_sources:
-                task = download_and_parse_article(
+                task = self.domain_limited_download(
                     extracted_source.url,
                     date_according_to_calling_func=extracted_source.date,
                     prefer_own_publish_date=True,

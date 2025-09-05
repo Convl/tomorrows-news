@@ -149,7 +149,7 @@ async def delete_scraping_source(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a scraping source and clean up orphaned events"""
-    # Load and enforce ownership
+    
     query = (
         select(ScrapingSourceDB)
         .join(TopicDB, ScrapingSourceDB.topic_id == TopicDB.id)
@@ -174,10 +174,9 @@ async def delete_scraping_source(
 
     # Delete the scraping source (cascades to extracted_events)
     await db.delete(source)
-    await db.flush()  # Execute the delete but don't commit yet
+    await db.flush()  
 
-    # For each potentially orphaned event, check if it has any remaining extracted_events
-    # If not, delete the event
+    # For each potentially orphaned event, check if it has any remaining extracted_events. Delete if it doesnt.
     if potentially_orphaned_event_ids:
         for event_id in potentially_orphaned_event_ids:
             remaining_extracted_events = (
@@ -188,7 +187,6 @@ async def delete_scraping_source(
             ).scalar()
             
             if remaining_extracted_events == 0:
-                # Delete the orphaned event
                 orphaned_event = (
                     await db.execute(select(EventDB).where(EventDB.id == event_id))
                 ).scalars().first()

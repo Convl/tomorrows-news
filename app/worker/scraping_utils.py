@@ -355,7 +355,7 @@ def _is_article_html_good_quality(article_html: str) -> bool:
         markup_length = len(article_html) - len(text_content)
         if markup_length > 0:
             text_ratio = len(text_content) / (len(text_content) + markup_length)
-            if text_ratio < 0.5:  # At least 50% actual text
+            if text_ratio < 0.4:  # At least 40% actual text
                 return False
             
         return True
