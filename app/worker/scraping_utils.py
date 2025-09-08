@@ -142,39 +142,39 @@ def choose_input_for_markdownify(article_html: str, full_html: str, logger: "Log
 
 def extract_main_content_by_ratio(raw_html: str) -> str | None:
     """Extract main article content using recursive text-to-HTML ratio analysis."""
-    
+
     try:
-        soup = BeautifulSoup(raw_html, 'html.parser')
-        
+        soup = BeautifulSoup(raw_html, "html.parser")
+
         # Pre-filter HTML to remove guaranteed non-content elements
         filtered_soup = prefilter_html(soup)
-        
+
         # Find leaf text elements (elements with text but no text-containing children)
         leaf_text_elements = find_leaf_text_elements(filtered_soup)
-        
+
         if not leaf_text_elements:
             return raw_html
-        
+
         # Find optimal container using bottom-up recursive analysis
         memo = {}
         best_element = None
         best_score = 0
-        
+
         for leaf_element in leaf_text_elements:
-            optimal_element, score = find_optimal_ancestor(leaf_element, memo)
+            optimal_element, score = find_optimal_higher_node(leaf_element, memo)
             text_length = len(optimal_element.get_text(strip=True))
-            
+
             if text_length >= MIN_ARTICLE_LENGTH and score > best_score:
                 best_score = score
                 best_element = optimal_element
-        
+
         if best_element is not None:
             # Clean empty elements from the result before returning
             cleaned_element = remove_empty_elements(best_element)
             return str(cleaned_element)
         else:
             return None
-            
+
     except Exception:
         return None
 
@@ -187,63 +187,90 @@ def remove_empty_elements(element):
         # Skip if this element has text content
         if child.get_text(strip=True):
             continue
-        
+
         # Skip important structural elements even if empty
-        if child.name in ['br', 'hr', 'wbr']:
+        if child.name in ["br", "hr", "wbr"]:
             continue
-            
+
         empty_elements.append(child)
-    
+
     # Remove empty elements
     for empty_elem in empty_elements:
         empty_elem.decompose()
-    
+
     return element
 
 
 def find_leaf_text_elements(soup: BeautifulSoup) -> list:
     """Find leaf text elements - elements that contain text but have no text-containing children."""
     leaf_elements = []
-    
+
     # Get all elements that contain text
     text_containing_elements = []
     for element in soup.find_all():
         if element.get_text(strip=True):
             text_containing_elements.append(element)
-    
+
     # Filter to only leaf elements (no text-containing descendants)
     for element in text_containing_elements:
         has_text_containing_children = False
-        
+
         # Check if any descendants contain text
         for descendant in element.find_all():
             if descendant != element and descendant.get_text(strip=True):
                 has_text_containing_children = True
                 break
-        
+
         if not has_text_containing_children:
             leaf_elements.append(element)
-    
+
     return leaf_elements
 
 
 def prefilter_html(soup: BeautifulSoup) -> BeautifulSoup:
     """Remove elements guaranteed not to contain article content."""
     # Elements to remove completely
-    unwanted_tags = ['script', 'style', 'noscript', 'img', 'svg', 'video', 
-                     'nav', 'footer', 'header', 'aside', 'iframe', 'canvas',
-                     'audio', 'track', 'source', 'object', 'embed', 'map', 'area',
-                     'form', 'button', 'input', 'select', 'textarea', 'progress', 
-                     'meter', 'menu', 'menuitem', 'dialog', 'template']
-    
+    unwanted_tags = [
+        "script",
+        "style",
+        "noscript",
+        "img",
+        "svg",
+        "video",
+        "nav",
+        "footer",
+        "header",
+        "aside",
+        "iframe",
+        "canvas",
+        "audio",
+        "track",
+        "source",
+        "object",
+        "embed",
+        "map",
+        "area",
+        "form",
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "progress",
+        "meter",
+        "menu",
+        "menuitem",
+        "dialog",
+        "template",
+    ]
+
     for tag_name in unwanted_tags:
         for element in soup.find_all(tag_name):
             element.decompose()
-    
+
     # Remove HTML comments
     for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
         comment.extract()
-    
+
     return soup
 
 
@@ -251,47 +278,47 @@ def calculate_container_score(element) -> float:
     """Calculate score as text_length * text_to_html_ratio."""
     if not element:
         return 0.0
-    
-    # Get all text content
+
+    # Get text content of current + all children
     text_content = element.get_text(strip=True)
     text_length = len(text_content)
-    
+
     if text_length == 0:
         return 0.0
-    
-    # Get HTML markup length
+
+    # Get HTML markup length of current, including all children
     html_content = str(element)
     markup_length = len(html_content) - text_length
-    
+
     if markup_length < 0:
         markup_length = 0
-    
+
     # Calculate text-to-HTML ratio
     total_length = text_length + markup_length
     if total_length == 0:
         return 0.0
-    
+
     text_to_html_ratio = text_length / total_length
-    
+
     # Final score: text_length * ratio
     return text_length * text_to_html_ratio
 
 
-def find_optimal_ancestor(element, memo: dict) -> tuple:
-    """Find the optimal ancestor by evaluating all ancestors up the tree."""
+def find_optimal_higher_node(element, memo: dict) -> tuple:
+    """Find the optimal higher node by evaluating all higher nodes up the tree."""
     # Check memo to avoid recalculation
     if element in memo:
         return memo[element]
-    
+
     best_element = element
     best_score = calculate_container_score(element)
     traversed_elements = [element]  # Track all elements we evaluate
-    
+
     # Traverse all ancestors and find the one with the highest score
     current = element
     while current.parent and current.parent.name:  # Skip NavigableString parents
         current = current.parent
-        
+
         # Check if parent is already memoized
         if current in memo:
             parent_best_element, parent_best_score = memo[current]
@@ -299,21 +326,21 @@ def find_optimal_ancestor(element, memo: dict) -> tuple:
                 best_element = parent_best_element
                 best_score = parent_best_score
             break
-        
+
         # Track this element for memoization
         traversed_elements.append(current)
-        
+
         # Calculate score for this ancestor
         current_score = calculate_container_score(current)
         if current_score > best_score:
             best_element = current
             best_score = current_score
-    
+
     # Memoize ALL elements in the traversal path with the optimal result
     result = (best_element, best_score)
     for traversed_element in traversed_elements:
         memo[traversed_element] = result
-    
+
     return result
 
 
@@ -327,15 +354,14 @@ def sanitize_html(raw_html: str) -> str | None:
 
     if main_content is None:
         return None
-    
+
     # Unescape HTML entities like &shy;, &nbsp;, etc.
     unescaped_html = html.unescape(main_content)
 
     # TODO: Check if markdownify has issues with any other HTML entities or just this one
     cleaned_html = unescaped_html.replace("&shy;", " ")
-    
-    return cleaned_html
 
+    return cleaned_html
 
 
 def _is_article_html_good_quality(article_html: str) -> bool:
@@ -344,22 +370,22 @@ def _is_article_html_good_quality(article_html: str) -> bool:
         return False
 
     try:
-        soup = BeautifulSoup(article_html, 'html.parser')
+        soup = BeautifulSoup(article_html, "html.parser")
         text_content = soup.get_text(strip=True)
-        
+
         # Basic length checks
         if len(text_content) < MIN_ARTICLE_LENGTH or len(text_content) > MAX_ARTICLE_LENGTH:
             return False
-        
+
         # Check text-to-markup ratio
         markup_length = len(article_html) - len(text_content)
         if markup_length > 0:
             text_ratio = len(text_content) / (len(text_content) + markup_length)
             if text_ratio < 0.4:  # At least 40% actual text
                 return False
-            
+
         return True
-        
+
     except Exception:
         # If BeautifulSoup parsing fails, fall back to basic checks
         article_len = len(article_html.strip())
