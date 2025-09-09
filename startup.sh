@@ -1,10 +1,1 @@
-#!/bin/bash
-# Install uv first
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.cargo/bin:$PATH"
-
-# Use uv with pyproject.toml (much better!)
-uv sync --frozen
-
-# Start the application
-exec "$@"
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --timeout 3600 --graceful-timeout 600

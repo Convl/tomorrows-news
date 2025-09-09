@@ -123,7 +123,7 @@ def create_logger():
         colorize=True,
         diagnose=True,
         level="INFO",
-        format=format_record,  # Use our custom format function
+        format=format_record,  
     )
 
     # Add logtail handler
@@ -135,7 +135,7 @@ def create_logger():
         colorize=True,
         diagnose=True,
         level="INFO",
-        format=format_record,
+        format='<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>',
     )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
