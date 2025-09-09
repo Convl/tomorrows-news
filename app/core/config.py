@@ -76,7 +76,7 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: SecretStr
     OPENROUTER_BASE_URL: str = ""
-    
+
     # Application Insights
     APPLICATIONINSIGHTS_CONNECTION_STRING: str = ""
 
@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    LOGTAIL_TOKEN: str = ""
+    LOGTAIL_INGESTING_HOST: str = ""
 
 
 settings = Settings()

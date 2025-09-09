@@ -5,6 +5,7 @@
 import logging
 import sys
 
+from logtail import LogtailHandler
 from loguru import logger
 
 from app.core.config import settings
@@ -50,7 +51,6 @@ def filter_app_traceback(exc_info):
 
 def format_record(record):
     """Custom formatter that conditionally shows extra fields"""
-
 
     # Base format
     format_string = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level>"
@@ -114,7 +114,7 @@ class InterceptHandler(logging.Handler):
 
 def create_logger():
     logger.remove()
-    
+
     # Add stdout logger
     logger.add(
         sys.stdout,
@@ -125,44 +125,18 @@ def create_logger():
         level="INFO",
         format=format_record,  # Use our custom format function
     )
-    
-    # Add Azure Application Insights if connection string provided
-    if settings.APPLICATIONINSIGHTS_CONNECTION_STRING:
-        try:
-            from azure.monitor.opentelemetry import configure_azure_monitor
-            
-            # Configure Azure Monitor with OpenTelemetry (automatically sets up logging)
-            configure_azure_monitor(
-                # This automatically configures logging, metrics, and tracing
-                enable_logging=True,
-            )
-            
-            # Add loguru sink that sends to the configured stdlib logging system
-            def sink_azure_app_insights(message):
-                record = message.record
-                # Get the root logger which now has Azure Monitor configured
-                stdlib_logger = logging.getLogger("tomorrows-news")
-                
-                # Create a stdlib logging record from loguru record
-                stdlib_record = logging.LogRecord(
-                    name="tomorrows-news",
-                    level=record["level"].no,
-                    pathname=str(record["file"].path),
-                    lineno=record["line"],
-                    msg=record["message"],
-                    args=(),
-                    exc_info=record["exception"]
-                )
-                # Send to Azure via the configured logging system
-                stdlib_logger.handle(stdlib_record)
-            
-            logger.add(sink_azure_app_insights, format="{message}", level="INFO")
-            logger.info("Azure Application Insights logging configured with OpenTelemetry")
-            
-        except ImportError:
-            logger.warning("Azure Monitor OpenTelemetry not installed. Add 'azure-monitor-opentelemetry' to dependencies")
-        except Exception as e:
-            logger.error(f"Failed to setup Azure Application Insights logging: {e}")
+
+    # Add logtail handler
+    logtail_handler = LogtailHandler(source_token=settings.LOGTAIL_TOKEN, host=settings.LOGTAIL_INGESTING_HOST)
+    logger.add(
+        logtail_handler,
+        enqueue=True,
+        backtrace=True,
+        colorize=True,
+        diagnose=True,
+        level="INFO",
+        format=format_record,
+    )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
     for _log in ["uvicorn.access", "uvicorn", "uvicorn.error", "fastapi"]:
