@@ -25,7 +25,15 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
     """Get all jobs"""
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-    return scheduler.get_jobs()
+    jobs = scheduler.get_jobs()
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+        }
+        for job in jobs
+    ]
 
 
 @router.get("/debug")
