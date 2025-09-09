@@ -8,6 +8,8 @@ app/debugging/
 app/discarded/
 app/tests/
 app/utils/
+*.zip
+webapp_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

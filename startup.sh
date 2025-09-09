@@ -1,4 +1,1 @@
-#!/bin/bash
-# Azure App Service startup script
-cd /home/site/wwwroot
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --timeout 3600 --graceful-timeout 600
