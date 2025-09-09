@@ -114,6 +114,8 @@ class InterceptHandler(logging.Handler):
 
 def create_logger():
     logger.remove()
+    
+    # Add stdout logger
     logger.add(
         sys.stdout,
         enqueue=True,
@@ -123,6 +125,43 @@ def create_logger():
         level="INFO",
         format=format_record,  # Use our custom format function
     )
+    
+    # Add Azure Application Insights if connection string provided
+    if settings.APPLICATIONINSIGHTS_CONNECTION_STRING:
+        try:
+            from opencensus.ext.azure.log_exporter import AzureLogHandler
+            
+            # Create Azure handler for stdlib logging
+            azure_handler = AzureLogHandler(
+                connection_string=settings.APPLICATIONINSIGHTS_CONNECTION_STRING
+            )
+            
+            # Set up stdlib logger that will receive propagated loguru messages
+            stdlib_logger = logging.getLogger("azure")
+            stdlib_logger.addHandler(azure_handler)
+            stdlib_logger.setLevel(logging.INFO)
+            
+            # Add loguru sink that converts records to stdlib logging format
+            def sink_azure_app_insights(message):
+                record = message.record
+                # Create a stdlib logging record from loguru record
+                stdlib_record = logging.LogRecord(
+                    name="tomorrows-news",
+                    level=record["level"].no,
+                    pathname=record["file"].path,
+                    lineno=record["line"],
+                    msg=record["message"],
+                    args=(),
+                    exc_info=record["exception"]
+                )
+                # Send to Azure via stdlib logger
+                stdlib_logger.handle(stdlib_record)
+            
+            logger.add(sink_azure_app_insights, format="{message}", level="INFO")
+            
+        except Exception as e:
+            logger.error(f"Failed to setup Azure Application Insights logging: {e}")
+            
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
     for _log in ["uvicorn.access", "uvicorn", "uvicorn.error", "fastapi"]:
         _logger = logging.getLogger(_log)

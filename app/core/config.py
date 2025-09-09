@@ -76,6 +76,9 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: SecretStr
     OPENROUTER_BASE_URL: str = ""
+    
+    # Application Insights
+    APPLICATIONINSIGHTS_CONNECTION_STRING: str = ""
 
     OPENAI_API_KEY: SecretStr
 
