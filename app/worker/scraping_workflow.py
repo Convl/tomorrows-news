@@ -472,7 +472,7 @@ class Scraper:
                 base_url=state.scraping_source.base_url,
             )
             sources = await web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service)
-            # sources = await self.deduplicate_sources(sources, state.scraping_source)
+            sources = await self.deduplicate_sources(sources, state.scraping_source)
             return {"sources": sources}
         else:
             return {}

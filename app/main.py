@@ -1,6 +1,12 @@
+# Set up loguru first, as create_logger modifies global logger singleton
+from loguru import logger
+
+from app.core.custom_logging import create_logger
+
+create_logger()
+
 from contextlib import asynccontextmanager
 
-from loguru import logger
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +14,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.custom_logging import create_logger
 from app.worker.scheduler import scheduler
 
 
@@ -26,9 +31,6 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
-
-# Initialize loguru logging once for entire project
-create_logger()
 
 
 # Set up CORS middleware

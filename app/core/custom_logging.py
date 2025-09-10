@@ -70,7 +70,7 @@ class InterceptHandler(logging.Handler):
         while frame and (depth == 0 or frame.f_code.co_filename == logging.__file__):
             frame = frame.f_back
             depth += 1
-        
+
         try:
             message = record.getMessage()
         except (TypeError, ValueError) as e:
@@ -133,5 +133,10 @@ def create_logger():
     logging.getLogger("asyncio").setLevel(logging.ERROR)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
+    # Set loguru global singleton logger to colors=True so that color-tags are correctly interpreted within messages
+    # cf https://github.com/Delgan/loguru/issues/80
+    import loguru
+    loguru.logger = logger.opt(colors=True)
 
     return logger
