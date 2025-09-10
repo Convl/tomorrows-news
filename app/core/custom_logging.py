@@ -5,6 +5,7 @@
 import logging
 import sys
 from datetime import datetime, timezone
+import pytz
 
 from logtail import LogtailHandler
 from loguru import logger
@@ -86,13 +87,14 @@ class InterceptHandler(logging.Handler):
 
 
 class CustomLogtailHandler(LogtailHandler):
-    """Custom Handler to display local time without microseconds in its own column on logtail"""
+    """Custom Handler to display local German time without microseconds in its own column on logtail"""
+    german_tz = pytz.timezone('Europe/Berlin')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def emit(self, record):
-        local_dt = datetime.fromtimestamp(record.created).replace(microsecond=0)
+        local_dt = datetime.fromtimestamp(record.created, tz=self.german_tz).replace(microsecond=0)
         record.local_dt = local_dt
         super().emit(record)
 
