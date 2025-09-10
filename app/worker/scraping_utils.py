@@ -87,7 +87,7 @@ async def extract_sources_from_web(
         ]
         response = await llm_service.source_extracting_llm.ainvoke(messages)
         extracted_sources: list[WebSourceBase] = response["parsed"].sources
-        log += f" LLM extracted <cyan>{len(extracted_sources)}</cyan> sources from <cyan>{scraping_source.id}</cyan> ({scraping_source.base_url})."
+        log += f" LLM extracted <cyan>{len(extracted_sources)}</cyan> sources from scraping source with id:<cyan>{scraping_source.id}</cyan> ({scraping_source.base_url})."
         logger.info(log)
 
         for extracted_source in extracted_sources:

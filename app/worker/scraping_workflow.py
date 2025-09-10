@@ -48,6 +48,7 @@ from .scraping_utils import (
 )
 
 CONSIDER_SAME_EVENT_THRESHOLD = 0.7
+POSSIBLY_SAME_EVENT_THRESHOLD = 0.6
 CONSIDER_NEW_DATE_TRUE_THRESHOLD = 3
 CONSIDER_NEW_DURATION_TRUE_THRESHOLD = 3
 CONSIDER_NEW_LOCATION_TRUE_THRESHOLD = 3
@@ -319,7 +320,7 @@ class Scraper:
                 event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
 
                 # TODO: change to if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD, remove the latter condition in the next if clause, once confident about the threshold value
-                if event_db:
+                if event_db and similarity > POSSIBLY_SAME_EVENT_THRESHOLD:
                     merge_response = await self.merge_with_llm_if_same_event(extracted_event_db, event_db)
                     await self.store_event_comparison(
                         extracted_event_db,
@@ -340,7 +341,7 @@ class Scraper:
                         same_event=merge_response.is_same_event,
                     )
                     # if extracted_event_db and event_db both refer to the same real-world event according to their vector scores and merge_with_llm_if_same_event, merge them
-                    if merge_response.is_same_event and similarity > CONSIDER_SAME_EVENT_THRESHOLD:
+                    if merge_response.is_same_event:
                         self.logger.info(
                             "### Merging <cyan>{title_1}</cyan> ({id_1}) into <cyan>{title_2}</cyan> ({id_2})",
                             title_1=extracted_event_db.title,
