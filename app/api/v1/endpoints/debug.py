@@ -40,7 +40,7 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
 @router.get("/debug")
 async def dbg(current_user: UserDB = Depends(current_active_user)):
     """Debug endpoint, used for testing various things"""
-    logger.info("Debug endpoint called")
+    logger.opt(ansi=True).info("This <red>is</red> a <yellow>test</yellow> message")
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 

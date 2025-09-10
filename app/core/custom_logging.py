@@ -4,6 +4,7 @@
 
 import logging
 import sys
+from datetime import datetime, timezone
 
 from logtail import LogtailHandler
 from loguru import logger
@@ -49,30 +50,6 @@ def filter_app_traceback(exc_info):
     return exc_info
 
 
-def format_record(record):
-    """Custom formatter that conditionally shows extra fields"""
-
-    # Base format
-    format_string = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level>"
-
-    # Only add source_id if it exists
-    source_id = record["extra"].get("source_id", None)
-    if source_id:
-        format_string += f" | <yellow>src:{source_id}</yellow>"
-
-    # Add other conditional fields here if needed
-
-    # Complete the format: inject message directly so its color tags are parsed
-    # Escape braces in message to not interfere with own formatting
-    # TODO: this can cause failures when html tags are present in the logged message. Figure out a better way to preserve color tags
-    message = record["message"].replace("{", "{{").replace("}", "}}")
-    format_string += (
-        " | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - " + f"<level>{message}</level>"
-    )
-
-    return format_string + "\n{exception}"
-
-
 class InterceptHandler(logging.Handler):
     loglevel_mapping = {
         50: "CRITICAL",
@@ -93,23 +70,31 @@ class InterceptHandler(logging.Handler):
         while frame and (depth == 0 or frame.f_code.co_filename == logging.__file__):
             frame = frame.f_back
             depth += 1
-
-        log = logger.bind(request_id="app")  # TODO: Actually make this functional at some point
-
-        # Handle malformed log messages from third-party libraries
+        
         try:
             message = record.getMessage()
         except (TypeError, ValueError) as e:
-            # Fallback for broken log formatting (like newspaper's %d with list)
+            # Fallback for malformed log messages from third-party libraries (like newspaper's %d with list)
             message = f"[MALFORMED LOG] {record.msg} (args: {record.args}) - Error: {e}"
 
         # Filter traceback to only show app code for exceptions (if enabled)
-        # TODO: Figure out why stack traces are sometimes excessive
         if settings.FILTER_LIBRARY_TRACEBACKS and record.exc_info:
             filtered_exc_info = filter_app_traceback(record.exc_info)
         else:
             filtered_exc_info = record.exc_info
-        log.opt(depth=depth, exception=filtered_exc_info).log(level, message)
+        logger.opt(depth=depth, exception=filtered_exc_info).log(level, message)
+
+
+class CustomLogtailHandler(LogtailHandler):
+    """Custom Handler to display local time without microseconds in its own column on logtail"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def emit(self, record):
+        local_dt = datetime.fromtimestamp(record.created).replace(microsecond=0)
+        record.local_dt = local_dt
+        super().emit(record)
 
 
 def create_logger():
@@ -123,11 +108,11 @@ def create_logger():
         colorize=True,
         diagnose=True,
         level="INFO",
-        format=format_record,  
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     )
 
     # Add logtail handler
-    logtail_handler = LogtailHandler(source_token=settings.LOGTAIL_TOKEN, host=settings.LOGTAIL_INGESTING_HOST)
+    logtail_handler = CustomLogtailHandler(source_token=settings.LOGTAIL_TOKEN, host=settings.LOGTAIL_INGESTING_HOST)
     logger.add(
         logtail_handler,
         enqueue=True,
@@ -135,7 +120,7 @@ def create_logger():
         colorize=True,
         diagnose=True,
         level="INFO",
-        format='<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>',
+        format="<level>{message}</level>",
     )
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
