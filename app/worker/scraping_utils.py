@@ -62,15 +62,39 @@ async def extract_sources_from_web(
     config = Config()
     config.memorize_articles = False
     config.disable_category_cache = True
-    website = await asyncio.to_thread(newspaper.build, scraping_source.base_url, only_in_path=True, config=config)
+    
+    logger.info("🔄 About to call newspaper.build for {url}...", url=scraping_source.base_url)
+    try:
+        website = await asyncio.wait_for(
+            asyncio.to_thread(newspaper.build, scraping_source.base_url, only_in_path=True, config=config),
+            timeout=120  # 2 minute timeout for newspaper.build
+        )
+        logger.info("✅ newspaper.build completed for {url}, found {count} articles", 
+                   url=scraping_source.base_url, count=len(website.articles))
+    except asyncio.TimeoutError:
+        logger.error("❌ TIMEOUT: newspaper.build took longer than 2 minutes for {url}", url=scraping_source.base_url)
+        raise Exception(f"newspaper.build timed out for {scraping_source.base_url}")
+    except Exception as e:
+        logger.error("❌ ERROR in newspaper.build for {url}: <red>{e}</red>", url=scraping_source.base_url, e=e)
+        raise
 
     # If newspaper failed to propperly retrieve the articles listed on the page...
     if len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
         # Parse the page AS an Article instead
         log = f"❌ Newspaper failed to retrieve scraping source <cyan>{scraping_source.id}</cyan> ({scraping_source.base_url}) as Website, falling back to LLM-assisted parsing."
         website = Article(scraping_source.base_url, memoize_articles=False, disable_category_cache=True)
-        await asyncio.to_thread(website.download)
-        await asyncio.to_thread(website.parse)
+        
+        logger.info("🔄 About to download article for LLM parsing...")
+        try:
+            await asyncio.wait_for(asyncio.to_thread(website.download), timeout=60)  # 1 minute timeout
+            await asyncio.wait_for(asyncio.to_thread(website.parse), timeout=30)   # 30 second timeout  
+            logger.info("✅ Article download and parse completed for LLM processing")
+        except asyncio.TimeoutError:
+            logger.error("❌ TIMEOUT: Article download/parse took too long for {url}", url=scraping_source.base_url)
+            raise Exception(f"Article processing timed out for {scraping_source.base_url}")
+        except Exception as e:
+            logger.error("❌ ERROR in article download/parse: <red>{e}</red>", e=e)
+            raise
 
         # Choose Website as parsed by newspaper or raw html for source extraction
         input = choose_input_for_listing_page(website.article_html, website.html, scraping_source.base_url, logger)

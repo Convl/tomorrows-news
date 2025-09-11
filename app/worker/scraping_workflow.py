@@ -472,9 +472,26 @@ class Scraper:
                 id=state.scraping_source.id,
                 base_url=state.scraping_source.base_url,
             )
-            sources = await web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service)
-            sources = await self.deduplicate_sources(sources, state.scraping_source)
-            return {"sources": sources}
+            
+            try:
+                self.logger.info("🔄 About to call web_sources_from_scraping_source...")
+                sources = await asyncio.wait_for(
+                    web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service),
+                    timeout=300  # 5 minute timeout
+                )
+                self.logger.info("✅ web_sources_from_scraping_source completed, found {count} sources", count=len(sources))
+                
+                self.logger.info("🔄 About to deduplicate sources...")
+                sources = await self.deduplicate_sources(sources, state.scraping_source)
+                self.logger.info("✅ Source deduplication completed, {count} sources remaining", count=len(sources))
+                
+                return {"sources": sources}
+            except asyncio.TimeoutError:
+                self.logger.error("❌ TIMEOUT: web_sources_from_scraping_source took longer than 5 minutes")
+                raise Exception("Source extraction timed out after 5 minutes")
+            except Exception as e:
+                self.logger.error("❌ ERROR in source extraction: <red>{e}</red>", e=e)
+                raise
         else:
             return {}
 
