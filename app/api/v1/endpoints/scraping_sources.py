@@ -11,10 +11,12 @@ from app.database import get_db
 from app.models.event import EventDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.scraping_source import ScrapingSourceDB
+from app.models.websource import WebSourceDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
 from app.schemas.scraping_source import ScrapingSourceCreate, ScrapingSourceResponse, ScrapingSourceUpdate
 from app.worker.scheduler import scheduler
+from loguru import logger
 
 router = APIRouter()
 
@@ -149,17 +151,28 @@ async def delete_scraping_source(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a scraping source and clean up orphaned events"""
-    
+    log = f"Attempting to delete scraping source with id: {source_id} "
+
     query = (
         select(ScrapingSourceDB)
         .join(TopicDB, ScrapingSourceDB.topic_id == TopicDB.id)
         .where(ScrapingSourceDB.id == source_id)
     )
+
     if not current_user.is_superuser:
         query = query.where(TopicDB.user_id == current_user.id)
+
     source = (await db.execute(query)).scalars().first()
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
+        log += "\n❌ ERROR: Scraping source not found or belongs to another user"
+        logger.warning(log)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found or belongs to another user")
+
+    affected_extracted_event_ids = (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.scraping_source_id == source_id))).scalars().all()
+    log += f"\nIDS of ExtractedEvents that got deleted as a result: {', '.join(map(str, affected_extracted_event_ids))}"
+
+    affected_web_source_ids = (await db.execute(select(WebSourceDB.id).where(WebSourceDB.scraping_source_id == source_id))).scalars().all()
+    log += f"\nIDS of WebSources that got deleted as a result: {', '.join(map(str, affected_web_source_ids))}"
 
     # Get event IDs that may become orphaned after deletion
     event_ids_query = (
@@ -171,6 +184,7 @@ async def delete_scraping_source(
         .distinct()
     )
     potentially_orphaned_event_ids = (await db.execute(event_ids_query)).scalars().all()
+    orphaned_event_ids = []
 
     # Delete the scraping source (cascades to extracted_events)
     await db.delete(source)
@@ -191,7 +205,14 @@ async def delete_scraping_source(
                     await db.execute(select(EventDB).where(EventDB.id == event_id))
                 ).scalars().first()
                 if orphaned_event:
+                    orphaned_event_ids.append(orphaned_event.id)
                     await db.delete(orphaned_event)
 
     await db.commit()
-    return {"message": "Scraping source deleted successfully"}
+
+    log += f"\nIDS of Events that got deleted as a result: {', '.join(map(str, orphaned_event_ids))}"
+
+    log += "\n✅ SUCCESS: Scraping source deleted successfully"
+    logger.info(log)
+
+    return {"message": log}

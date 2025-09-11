@@ -36,6 +36,13 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
         for job in jobs
     ]
 
+@router.delete("/debug/delete-scraping-job/{source_id}")
+async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
+    """Delete a scraping job for a scraping source"""
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    scheduler.remove_job(job_id=f"scraping_source_{source_id}", jobstore="scraping")
+    return {"message": f"Job {f'scraping_source_{source_id}'} deleted"}
 
 @router.get("/debug")
 async def dbg(current_user: UserDB = Depends(current_active_user)):

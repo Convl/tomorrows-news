@@ -6,9 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import current_active_user, current_superuser
 from app.database import get_db
+from app.models.extracted_event import ExtractedEventDB
+from app.models.scraping_source import ScrapingSourceDB
+from app.models.event import EventDB
+from app.models.websource import WebSourceDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
 from app.schemas.topic import TopicCreate, TopicResponse, TopicUpdate, TopicWithCounts
+from loguru import logger
 
 router = APIRouter()
 
@@ -118,6 +123,8 @@ async def delete_topic(
     topic_id: int, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
 ):
     """Delete a topic and all its related data (only owner or admin)"""
+    log = f"Attempting to delete topic with id: {topic_id} "
+
     query = select(TopicDB).where(TopicDB.id == topic_id)
 
     # If not superuser, restrict to user's own topics
@@ -126,13 +133,24 @@ async def delete_topic(
 
     topic = (await db.execute(query)).scalars().first()
     if not topic:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+        log += "\n❌ ERROR: Topic not found or belongs to another user"
+        logger.warning(log)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found or belongs to another user")
 
-    # Delete topic - cascade relationships will handle cleanup of:
-    # - EventDB records (cascade="all, delete-orphan")
-    # - ExtractedEventDB records (cascade="all, delete-orphan") 
-    # - ScrapingSourceDB records (cascade="all, delete-orphan")
-    # - WebSourceDB records (cascade="all, delete-orphan")
+    affected_scraping_source_ids = (await db.execute(select(ScrapingSourceDB.id).where(ScrapingSourceDB.topic_id == topic_id))).scalars().all()
+    log += f"\nIDS of ScrapingSources that got deleted as a result: {', '.join(map(str, affected_scraping_source_ids))}"
+
+    affected_event_ids = (await db.execute(select(EventDB.id).where(EventDB.topic_id == topic_id))).scalars().all()
+    log += f"\nIDS of Events that got deleted as a result: {', '.join(map(str, affected_event_ids))}"
+
+    affected_extracted_event_ids = (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.topic_id == topic_id))).scalars().all()
+    log += f"\nIDS of ExtractedEvents that got deleted as a result: {', '.join(map(str, affected_extracted_event_ids))}"
+    
+    affected_web_source_ids = (await db.execute(select(WebSourceDB.id).where(WebSourceDB.topic_id == topic_id))).scalars().all()
+    log += f"\nIDS of WebSources that got deleted as a result: {', '.join(map(str, affected_web_source_ids))}"
+
     await db.delete(topic)
     await db.commit()
-    return {"message": "Topic deleted successfully"}
+    log += "\n✅ SUCCESS: Topic deleted successfully"
+    logger.info(log)
+    return {"message": log}

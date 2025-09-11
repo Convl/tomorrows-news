@@ -133,7 +133,7 @@ def choose_input_for_markdownify(article_html: str, full_html: str, logger: "Log
     else:
         sanitized_html = sanitize_html(full_html)
         if sanitized_html is None:
-            logger.info("❌ Could not sanitize HTML manually, using full HTML instead")
+            logger.info("❌ Could not sanitize HTML manually")
             return None
         else:
             logger.info("✅ Successfully sanitized HTML manually")
