@@ -719,8 +719,15 @@ class Scraper:
                 .scalars()
                 .one_or_none()
             )
+
+            # hack to ensure scraping jobs don't run twice when the local dev server is up
+            if not settings.IS_DEV_SERVER:
+                await asyncio.sleep(5) 
+                await db.refresh(scraping_source)
+
             if scraping_source.currently_scraping:
                 raise Exception("Scraping source is currently scraping")
+                
 
             scraping_source.currently_scraping = True
             db.add(scraping_source)

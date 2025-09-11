@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PYTHONASYNCIODEBUG: bool = False
     FILTER_LIBRARY_TRACEBACKS: bool = False  # Workaround to only show tracebacks from app code, not libraries
+    
+    # Server priority for scraping jobs
+    IS_DEV_SERVER: bool = False
 
     # Database connection settings
     DB_CONNECTION_RETRIES: int = 3

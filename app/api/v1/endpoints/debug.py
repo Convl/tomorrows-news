@@ -32,9 +32,11 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
             "id": job.id,
             "name": job.name,
             "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+            "max_instances": job.max_instances,
         }
         for job in jobs
     ]
+
 
 @router.delete("/debug/delete-scraping-job/{source_id}")
 async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
@@ -44,6 +46,7 @@ async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(cur
     scheduler.remove_job(job_id=f"scraping_source_{source_id}", jobstore="scraping")
     return {"message": f"Job {f'scraping_source_{source_id}'} deleted"}
 
+
 @router.get("/debug")
 async def dbg(current_user: UserDB = Depends(current_active_user)):
     """Debug endpoint, used for testing various things"""
@@ -52,6 +55,14 @@ async def dbg(current_user: UserDB = Depends(current_active_user)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
     source_id = 15
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import select
+
+    from app.database import get_db_session
+    from app.models import ScrapingSourceDB
+    from app.worker.scheduler import scheduler
+
 
     # Clear test data before running scraper
     # from sqlalchemy import delete, select
@@ -75,13 +86,6 @@ async def dbg(current_user: UserDB = Depends(current_active_user)):
     # await scraper.scrape()
 
     # Reschedule jobs
-    from datetime import datetime, timedelta, timezone
-
-    from sqlalchemy import select
-
-    from app.database import get_db_session
-    from app.models import ScrapingSourceDB
-    from app.worker.scheduler import scheduler
 
     # async with get_db_session() as db:
     #     sources = (await db.execute(select(ScrapingSourceDB))).scalars().all()

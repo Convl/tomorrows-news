@@ -100,6 +100,7 @@ class ScrapingSourceDB(Base):
                 next_run_time=datetime.datetime.now(datetime.timezone.utc),
                 executor="scraping",  # Use the async executor
                 replace_existing=True,
+                max_instances=1,
             )
 
     def remove_job(self):
