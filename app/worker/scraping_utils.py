@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import html
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -62,18 +63,59 @@ async def extract_sources_from_web(
     config = Config()
     config.memorize_articles = False
     config.disable_category_cache = True
-    
+    config.thread_timeout_seconds = 120
+
     logger.info("🔄 About to call newspaper.build for {url}...", url=scraping_source.base_url)
+
+    # Create a task that we can monitor
+    import time
+
+    start_time = time.time()
+
+    async def newspaper_build_with_progress():
+        """Wrapper that logs progress during newspaper.build"""
+        try:
+            logger.info("📰 Starting newspaper.build thread...")
+            result = await asyncio.to_thread(
+                newspaper.build, scraping_source.base_url, only_in_path=True, config=config
+            )
+            logger.info("📰 newspaper.build thread completed successfully")
+            return result
+        except Exception as e:
+            logger.error("📰 newspaper.build thread failed: <red>{e}</red>", e=e)
+            raise
+
+    # Monitor progress every 30 seconds
+    async def progress_monitor():
+        """Monitor and log progress every 30 seconds"""
+        while True:
+            await asyncio.sleep(30)
+            elapsed = time.time() - start_time
+            logger.info("⏱️  newspaper.build still running... {elapsed:.1f}s elapsed", elapsed=elapsed)
+
     try:
-        website = await asyncio.wait_for(
-            asyncio.to_thread(newspaper.build, scraping_source.base_url, only_in_path=True, config=config),
-            timeout=120  # 2 minute timeout for newspaper.build
-        )
-        logger.info("✅ newspaper.build completed for {url}, found {count} articles", 
-                   url=scraping_source.base_url, count=len(website.articles))
-    except asyncio.TimeoutError:
-        logger.error("❌ TIMEOUT: newspaper.build took longer than 2 minutes for {url}", url=scraping_source.base_url)
-        raise Exception(f"newspaper.build timed out for {scraping_source.base_url}")
+        # Start both the newspaper task and progress monitor
+        newspaper_task = asyncio.create_task(newspaper_build_with_progress())
+        monitor_task = asyncio.create_task(progress_monitor())
+
+        # Wait for newspaper task with timeout, cancel monitor when done
+        try:
+            website = await asyncio.wait_for(newspaper_task, timeout=120)  # 2 minute timeout
+            monitor_task.cancel()
+            logger.info(
+                "✅ newspaper.build completed for {url}, found {count} articles",
+                url=scraping_source.base_url,
+                count=len(website.articles),
+            )
+        except asyncio.TimeoutError:
+            # Cancel both tasks
+            newspaper_task.cancel()
+            monitor_task.cancel()
+            logger.error(
+                "❌ TIMEOUT: newspaper.build took longer than 2 minutes for {url}", url=scraping_source.base_url
+            )
+            raise Exception(f"newspaper.build timed out for {scraping_source.base_url}")
+
     except Exception as e:
         logger.error("❌ ERROR in newspaper.build for {url}: <red>{e}</red>", url=scraping_source.base_url, e=e)
         raise
@@ -83,11 +125,11 @@ async def extract_sources_from_web(
         # Parse the page AS an Article instead
         log = f"❌ Newspaper failed to retrieve scraping source <cyan>{scraping_source.id}</cyan> ({scraping_source.base_url}) as Website, falling back to LLM-assisted parsing."
         website = Article(scraping_source.base_url, memoize_articles=False, disable_category_cache=True)
-        
+
         logger.info("🔄 About to download article for LLM parsing...")
         try:
             await asyncio.wait_for(asyncio.to_thread(website.download), timeout=60)  # 1 minute timeout
-            await asyncio.wait_for(asyncio.to_thread(website.parse), timeout=30)   # 30 second timeout  
+            await asyncio.wait_for(asyncio.to_thread(website.parse), timeout=30)  # 30 second timeout
             logger.info("✅ Article download and parse completed for LLM processing")
         except asyncio.TimeoutError:
             logger.error("❌ TIMEOUT: Article download/parse took too long for {url}", url=scraping_source.base_url)
@@ -111,7 +153,7 @@ async def extract_sources_from_web(
         ]
         response = await asyncio.wait_for(
             llm_service.source_extracting_llm.ainvoke(messages),
-            timeout=180  # 3 minute timeout
+            timeout=180,  # 3 minute timeout
         )
         extracted_sources: list[WebSourceBase] = response["parsed"].sources
         log += f" LLM extracted <cyan>{len(extracted_sources)}</cyan> sources from scraping source with id:<cyan>{scraping_source.id}</cyan> ({scraping_source.base_url})."
@@ -155,9 +197,9 @@ async def extract_sources_from_web(
 def choose_input_for_listing_page(article_html: str, full_html: str, base_url: str, logger: "Logger") -> str | None:
     """Choose the best HTML input for a listing page that should contain article links."""
     from urllib.parse import urlparse
-    
+
     domain = urlparse(base_url).netloc
-    
+
     # Check if article_html contains meaningful article links
     if _has_sufficient_article_links(article_html, domain):
         logger.info("✅ Article HTML contains sufficient article links, using it")
@@ -175,26 +217,26 @@ def _has_sufficient_article_links(html_content: str, domain: str, min_links: int
     """Check if HTML contains at least min_links that look like article links."""
     if not html_content or not html_content.strip():
         return False
-    
+
     try:
         soup = BeautifulSoup(html_content, "html.parser")
         article_links = set()
-        
+
         # Find all links
-        for link in soup.find_all('a', href=True):
-            href = link.get('href', '').strip()
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "").strip()
             if not href:
                 continue
-                
+
             # Skip obvious non-article links
             if _is_likely_article_link(href, domain):
                 article_links.add(href)
-            
+
             if len(article_links) >= min_links:
                 return True
-        
+
         return False
-        
+
     except Exception:
         return False
 
@@ -204,19 +246,19 @@ def _is_likely_article_link(href: str, domain: str) -> bool:
     # TODO: This function is not very useful right now, as too many non-article-links will make it through
 
     href_lower = href.lower()
-    
-    skip_patterns = ['#', 'mailto:', 'tel:', 'javascript:']
-    
+
+    skip_patterns = ["#", "mailto:", "tel:", "javascript:"]
+
     for pattern in skip_patterns:
         if href_lower.startswith(pattern):
             return False
-    
+
     # Must be internal link or full URL to same domain
-    if href.startswith('/'):
+    if href.startswith("/"):
         return True
     elif domain in href:
         return True
-    
+
     return False
 
 
@@ -228,7 +270,9 @@ def choose_input_for_markdownify(article_html: str, full_html: str, logger: "Log
     else:
         sanitized_html = sanitize_html(full_html)
         if sanitized_html is None:
-            logger.info("❌ Could not sanitize HTML manually. Notice that this might be due to the article being behind a paywall, so MIN_ARTICLE_LENGTH might never be reached.")
+            logger.info(
+                "❌ Could not sanitize HTML manually. Notice that this might be due to the article being behind a paywall, so MIN_ARTICLE_LENGTH might never be reached."
+            )
             return None
         else:
             logger.info("✅ Successfully sanitized HTML manually")
