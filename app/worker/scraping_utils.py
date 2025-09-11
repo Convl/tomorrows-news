@@ -140,6 +140,7 @@ def choose_input_for_listing_page(article_html: str, full_html: str, base_url: s
         return article_html
     elif _has_sufficient_article_links(full_html, domain):
         logger.info("❌ Article HTML does not contain sufficient article links, but full HTML does, using it")
+        # no return sanitize(full_html) here, as it is only suited for articles, not listing pages
         return full_html
     else:
         logger.info("❌ Neither HTML version contains sufficient article links")
@@ -164,8 +165,11 @@ def _has_sufficient_article_links(html_content: str, domain: str, min_links: int
             # Skip obvious non-article links
             if _is_likely_article_link(href, domain):
                 article_links.add(href)
+            
+            if len(article_links) >= min_links:
+                return True
         
-        return len(article_links) >= min_links
+        return False
         
     except Exception:
         return False
@@ -173,21 +177,14 @@ def _has_sufficient_article_links(html_content: str, domain: str, min_links: int
 
 def _is_likely_article_link(href: str, domain: str) -> bool:
     """Determine if a link is likely to be an article link."""
+    # TODO: This function is not very useful right now, as too many non-article-links will make it through
+
     href_lower = href.lower()
     
-    # Skip obvious non-article patterns
-    skip_patterns = [
-        '#', 'mailto:', 'tel:', 'javascript:',
-        '/newsletter', '/subscribe', '/login', '/register',
-        '/about', '/contact', '/impressum', '/datenschutz',
-        '/rss', '/feed', '/sitemap', '/search',
-        '/category', '/tag', '/author', '/archive',
-        'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
-        '.pdf', '.jpg', '.png', '.gif', '.mp4', '.mp3'
-    ]
+    skip_patterns = ['#', 'mailto:', 'tel:', 'javascript:']
     
     for pattern in skip_patterns:
-        if pattern in href_lower:
+        if href_lower.startswith(pattern):
             return False
     
     # Must be internal link or full URL to same domain
@@ -207,7 +204,7 @@ def choose_input_for_markdownify(article_html: str, full_html: str, logger: "Log
     else:
         sanitized_html = sanitize_html(full_html)
         if sanitized_html is None:
-            logger.info("❌ Could not sanitize HTML manually")
+            logger.info("❌ Could not sanitize HTML manually. Notice that this might be due to the article being behind a paywall, so MIN_ARTICLE_LENGTH might never be reached.")
             return None
         else:
             logger.info("✅ Successfully sanitized HTML manually")
