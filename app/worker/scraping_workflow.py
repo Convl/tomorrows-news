@@ -747,16 +747,16 @@ class Scraper:
             await db.commit()
             await db.refresh(scraping_source)
 
-            self.logger.info("🔍 About to query current_topic...")
+            
             current_topic = (
                 (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
             )
-            self.logger.info("🔍 About to query current_user...")
+            
             current_user = (
                 (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
             )
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
-            self.logger.info("🔍 User queries completed, is_demo_user: {is_demo}", is_demo=is_demo_user)
+            
 
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
         
