@@ -1,8 +1,5 @@
 import asyncio
-import concurrent.futures
 import html
-import signal
-import threading
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -65,84 +62,37 @@ async def extract_sources_from_web(
     config = Config()
     config.memorize_articles = False
     config.disable_category_cache = True
-    config.thread_timeout_seconds = 120
-
-    logger.info("🔄 About to call newspaper.build for {url}...", url=scraping_source.base_url)
-
-    # Create a task that we can monitor
-    import time
-
-    start_time = time.time()
-
-    def _build_newspaper_sync():
-        """Synchronous newspaper.build function that can be interrupted"""
-        try:
-            return newspaper.build(scraping_source.base_url, only_in_path=True, config=config)
-        except Exception as e:
-            logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
-            raise
-
-    async def newspaper_build_with_progress():
-        """Wrapper that logs progress during newspaper.build with proper timeout and cleanup"""
-        try:
-            logger.info("📰 Starting newspaper.build in thread...")
-            
-            # Use ThreadPoolExecutor with asyncio.wait_for for clean timeout handling
-            loop = asyncio.get_event_loop()
-            result = await asyncio.wait_for(
-                loop.run_in_executor(None, _build_newspaper_sync),
-                timeout=120
-            )
-            
-            logger.info("📰 newspaper.build thread completed successfully")
-            return result
-        except asyncio.TimeoutError:
-            logger.error("📰 newspaper.build timed out after 120 seconds")
-            # The thread will be cleaned up automatically when the worker process exits
-            raise Exception("newspaper.build timeout")
-        except Exception as e:
-            logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
-            raise
-
-    # Monitor progress every 30 seconds
-    async def progress_monitor():
-        """Monitor and log progress every 30 seconds"""
-        while True:
-            await asyncio.sleep(30)
-            elapsed = time.time() - start_time
-            logger.info("⏱️  newspaper.build still running... {elapsed:.1f}s elapsed", elapsed=elapsed)
+    config.thread_timeout_seconds = 115
 
     website = None
     try:
-        # Start both the newspaper task and progress monitor
-        newspaper_task = asyncio.create_task(newspaper_build_with_progress())
-        monitor_task = asyncio.create_task(progress_monitor())
-
-        # Wait for newspaper task with timeout, cancel monitor when done
-        try:
-            website = await asyncio.wait_for(newspaper_task, timeout=120)  # 2 minute timeout
-            monitor_task.cancel()
-            logger.info(
-                "✅ newspaper.build completed for {url}, found {count} articles",
-                url=scraping_source.base_url,
-                count=len(website.articles),
-            )
-        except asyncio.TimeoutError:
-            # Cancel both tasks
-            newspaper_task.cancel()
-            monitor_task.cancel()
-            logger.warning(
-                "⚠️  TIMEOUT: newspaper.build took longer than 2 minutes for {url}, falling back to LLM-only parsing", 
-                url=scraping_source.base_url
-            )
-            website = None  # Force fallback to LLM parsing
-
-    except Exception as e:
-        logger.warning(
-            "⚠️  ERROR in newspaper.build for {url}: <red>{e}</red> - falling back to LLM-only parsing", 
-            url=scraping_source.base_url, e=e
+        logger.info("📰 Starting newspaper.build in thread...")
+        
+        # Use ThreadPoolExecutor with asyncio.wait_for for clean timeout handling  
+        loop = asyncio.get_event_loop()
+        website = await asyncio.wait_for(
+            loop.run_in_executor(
+                None, 
+                lambda: newspaper.build(scraping_source.base_url, only_in_path=True, config=config)
+            ),
+            timeout=120
         )
-        website = None  # Force fallback to LLM parsing
+        
+        logger.info("📰 newspaper.build thread completed successfully")
+    except asyncio.TimeoutError:
+        logger.warning("⚠️  newspaper.build timed out after 120 seconds for {url}, falling back to LLM-only parsing", 
+                      url=scraping_source.base_url)
+    except Exception as e:
+        logger.warning("⚠️  newspaper.build failed for {url}: <red>{e}</red> - falling back to LLM-only parsing", 
+                      url=scraping_source.base_url, e=e)
+
+    # Log results if successful
+    if website and len(website.articles) > 0:
+        logger.info(
+            "✅ newspaper.build completed for {url}, found {count} articles",
+            url=scraping_source.base_url,
+            count=len(website.articles),
+        )
 
     # If newspaper failed completely or didn't retrieve enough articles...
     if website is None or len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
