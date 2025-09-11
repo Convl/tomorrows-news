@@ -10,6 +10,7 @@ app/tests/
 app/utils/
 *.zip
 webapp_logs/
+various/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

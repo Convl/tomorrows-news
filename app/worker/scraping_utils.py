@@ -72,12 +72,12 @@ async def extract_sources_from_web(
         await asyncio.to_thread(website.download)
         await asyncio.to_thread(website.parse)
 
-        input = choose_input_for_markdownify(website.article_html, website.html, logger)
+        # Choose Website as parsed by newspaper or raw html for source extraction
+        input = choose_input_for_listing_page(website.article_html, website.html, scraping_source.base_url, logger)
         if input is None:
             log += "❌ Could not determine input for markdownify. Skipping."
-            logger.info(log)
+            logger.warning(log)
             return []
-
         markdown = markdownify(input)
 
         # Let LLM extract sources from the page
@@ -85,7 +85,10 @@ async def extract_sources_from_web(
             await llm_service.get_source_extraction_system_message(scraping_source.topic, scraping_source.base_url),
             HumanMessage(f"Extract sources from the following webpage: {markdown}"),
         ]
-        response = await llm_service.source_extracting_llm.ainvoke(messages)
+        response = await asyncio.wait_for(
+            llm_service.source_extracting_llm.ainvoke(messages),
+            timeout=180  # 3 minute timeout
+        )
         extracted_sources: list[WebSourceBase] = response["parsed"].sources
         log += f" LLM extracted <cyan>{len(extracted_sources)}</cyan> sources from scraping source with id:<cyan>{scraping_source.id}</cyan> ({scraping_source.base_url})."
         logger.info(log)
@@ -123,6 +126,77 @@ async def extract_sources_from_web(
             await asyncio.sleep(0.1)
 
     return sources
+
+
+def choose_input_for_listing_page(article_html: str, full_html: str, base_url: str, logger: "Logger") -> str | None:
+    """Choose the best HTML input for a listing page that should contain article links."""
+    from urllib.parse import urlparse
+    
+    domain = urlparse(base_url).netloc
+    
+    # Check if article_html contains meaningful article links
+    if _has_sufficient_article_links(article_html, domain):
+        logger.info("✅ Article HTML contains sufficient article links, using it")
+        return article_html
+    elif _has_sufficient_article_links(full_html, domain):
+        logger.info("❌ Article HTML does not contain sufficient article links, but full HTML does, using it")
+        return full_html
+    else:
+        logger.info("❌ Neither HTML version contains sufficient article links")
+        return None
+
+
+def _has_sufficient_article_links(html_content: str, domain: str, min_links: int = 5) -> bool:
+    """Check if HTML contains at least min_links that look like article links."""
+    if not html_content or not html_content.strip():
+        return False
+    
+    try:
+        soup = BeautifulSoup(html_content, "html.parser")
+        article_links = set()
+        
+        # Find all links
+        for link in soup.find_all('a', href=True):
+            href = link.get('href', '').strip()
+            if not href:
+                continue
+                
+            # Skip obvious non-article links
+            if _is_likely_article_link(href, domain):
+                article_links.add(href)
+        
+        return len(article_links) >= min_links
+        
+    except Exception:
+        return False
+
+
+def _is_likely_article_link(href: str, domain: str) -> bool:
+    """Determine if a link is likely to be an article link."""
+    href_lower = href.lower()
+    
+    # Skip obvious non-article patterns
+    skip_patterns = [
+        '#', 'mailto:', 'tel:', 'javascript:',
+        '/newsletter', '/subscribe', '/login', '/register',
+        '/about', '/contact', '/impressum', '/datenschutz',
+        '/rss', '/feed', '/sitemap', '/search',
+        '/category', '/tag', '/author', '/archive',
+        'facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com',
+        '.pdf', '.jpg', '.png', '.gif', '.mp4', '.mp3'
+    ]
+    
+    for pattern in skip_patterns:
+        if pattern in href_lower:
+            return False
+    
+    # Must be internal link or full URL to same domain
+    if href.startswith('/'):
+        return True
+    elif domain in href:
+        return True
+    
+    return False
 
 
 def choose_input_for_markdownify(article_html: str, full_html: str, logger: "Logger") -> str | None:

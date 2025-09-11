@@ -131,8 +131,8 @@
     const params = new URLSearchParams(window.location.search);
     const topicId = parseInt(params.get('topic_id'), 10);
     async function init() {
-      populateSelect(document.getElementById('country'), await fetchCountryOptions(true));
-      populateSelect(document.getElementById('language'), await fetchLanguageOptions(true));
+      populateSelect(document.getElementById('country'), await fetchCountryOptions(true), 'DE');
+      populateSelect(document.getElementById('language'), await fetchLanguageOptions(true), 'de');
       populateSelect(document.getElementById('source_type'), await fetchSourceTypeOptions());
 
       // Initialize custom tooltips
