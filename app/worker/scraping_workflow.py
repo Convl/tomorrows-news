@@ -474,16 +474,12 @@ class Scraper:
             )
             
             try:
-                self.logger.info("🔄 About to call web_sources_from_scraping_source...")
                 sources = await asyncio.wait_for(
                     web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service),
                     timeout=300  # 5 minute timeout
                 )
-                self.logger.info("✅ web_sources_from_scraping_source completed, found {count} sources", count=len(sources))
-                
-                self.logger.info("🔄 About to deduplicate sources...")
+
                 sources = await self.deduplicate_sources(sources, state.scraping_source)
-                self.logger.info("✅ Source deduplication completed, {count} sources remaining", count=len(sources))
                 
                 return {"sources": sources}
             except asyncio.TimeoutError:
@@ -762,46 +758,33 @@ class Scraper:
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
             self.logger.info("🔍 User queries completed, is_demo_user: {is_demo}", is_demo=is_demo_user)
 
-        self.logger.info("🔍 About to validate scraping_source_workflow...")
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
-        self.logger.info("🔍 ScrapingSourceWorkflow validation completed")
-
+        
         # Initialize LLM service
-        self.logger.info("🔍 About to initialize LlmService...")
         self.llm_service = LlmService(is_demo_user=is_demo_user)
-        self.logger.info("🔍 LlmService initialized")
-
-        self.logger.info("🔍 About to initialize OpenAI embeddings...")
+        
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
-        self.logger.info("🔍 OpenAI embeddings initialized")
-
+        
         # Setup initial state and graph
-        self.logger.info("🔍 About to create ScrapingState...")
         self.scraping_state = ScrapingState(
             scraping_source=scraping_source_workflow,
             sources=[],
             events=[],
         )
-        self.logger.info("🔍 ScrapingState created")
-
-        self.logger.info("🔍 About to create StateGraph...")
+        
         self.graph_builder = StateGraph(ScrapingState)
-        self.logger.info("🔍 StateGraph created")
-
+        
         # Add nodes
-        self.logger.info("🔍 About to add graph nodes...")
         self.graph_builder.add_node("start_source_extraction", self.start_source_extraction)
         self.graph_builder.add_node("extract_sources_from_single_source", self.extract_sources_from_single_source)
         self.graph_builder.add_node("extract_events_from_single_source", self.extract_events_from_single_source)
         self.graph_builder.add_node("prepare_event_extraction", self.prepare_event_extraction)
         self.graph_builder.add_node("commit_extracted_events_to_db", self.commit_extracted_events_to_db)
         self.graph_builder.add_node("print_events", self.print_events)
-        self.logger.info("🔍 Graph nodes added")
-
+        
         # Build the graph
-        self.logger.info("🔍 About to add graph edges...")
         self.graph_builder.add_edge(START, "start_source_extraction")
 
         # Phase 1: Source extraction with map-reduce
@@ -831,11 +814,9 @@ class Scraper:
         # After commiting events to db, go to print_events
         self.graph_builder.add_edge("commit_extracted_events_to_db", "print_events")
         self.graph_builder.add_edge("print_events", END)
-        self.logger.info("🔍 Graph edges added")
-
-        self.logger.info("🔍 About to compile graph...")
+        
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
-        self.logger.info("🔍 Graph compiled successfully")
+        self.logger.info("Graph compiled successfully")
 
     async def test(self, semantic_content: str):
         self.logger.info(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))

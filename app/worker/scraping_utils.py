@@ -87,7 +87,7 @@ async def extract_sources_from_web(
                       url=scraping_source.base_url, e=e)
 
     # Log results if successful
-    if website and len(website.articles) > 0:
+    if website:
         logger.info(
             "✅ newspaper.build completed for {url}, found {count} articles",
             url=scraping_source.base_url,
