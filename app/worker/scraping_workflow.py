@@ -592,6 +592,7 @@ class Scraper:
                     url=source.url,
                     published_date=source.date,
                     topic_id=state.scraping_source.topic.id,
+                    scraping_source_id=state.scraping_source.id,
                 )
                 db.add(source_db)
                 await db.flush()

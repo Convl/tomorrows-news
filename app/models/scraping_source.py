@@ -12,6 +12,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.extracted_event import ExtractedEventDB
     from app.models.topic import TopicDB
+    from app.models.websource import WebSourceDB
 
 
 class ScrapingSourceDB(Base):
@@ -54,6 +55,12 @@ class ScrapingSourceDB(Base):
     # ExtractedEvents extracted via this ScrapingSource
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
         "ExtractedEventDB", back_populates="scraping_source", cascade="all, delete-orphan", lazy="raise"
+    )
+
+    # Sources extracted via this ScrapingSource
+    # TODO: Reconsider this relationship, especially the cascade part. 
+    sources: Mapped[list["WebSourceDB"]] = relationship(
+        "WebSourceDB", back_populates="scraping_source", cascade="all, delete-orphan", lazy="raise"
     )
 
     # Timestamps
