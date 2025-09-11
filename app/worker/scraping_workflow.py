@@ -751,42 +751,57 @@ class Scraper:
             await db.commit()
             await db.refresh(scraping_source)
 
+            self.logger.info("🔍 About to query current_topic...")
             current_topic = (
                 (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
             )
+            self.logger.info("🔍 About to query current_user...")
             current_user = (
                 (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
             )
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
+            self.logger.info("🔍 User queries completed, is_demo_user: {is_demo}", is_demo=is_demo_user)
 
+        self.logger.info("🔍 About to validate scraping_source_workflow...")
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
+        self.logger.info("🔍 ScrapingSourceWorkflow validation completed")
 
         # Initialize LLM service
-
+        self.logger.info("🔍 About to initialize LlmService...")
         self.llm_service = LlmService(is_demo_user=is_demo_user)
+        self.logger.info("🔍 LlmService initialized")
 
+        self.logger.info("🔍 About to initialize OpenAI embeddings...")
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
+        self.logger.info("🔍 OpenAI embeddings initialized")
 
         # Setup initial state and graph
+        self.logger.info("🔍 About to create ScrapingState...")
         self.scraping_state = ScrapingState(
             scraping_source=scraping_source_workflow,
             sources=[],
             events=[],
         )
+        self.logger.info("🔍 ScrapingState created")
 
+        self.logger.info("🔍 About to create StateGraph...")
         self.graph_builder = StateGraph(ScrapingState)
+        self.logger.info("🔍 StateGraph created")
 
         # Add nodes
+        self.logger.info("🔍 About to add graph nodes...")
         self.graph_builder.add_node("start_source_extraction", self.start_source_extraction)
         self.graph_builder.add_node("extract_sources_from_single_source", self.extract_sources_from_single_source)
         self.graph_builder.add_node("extract_events_from_single_source", self.extract_events_from_single_source)
         self.graph_builder.add_node("prepare_event_extraction", self.prepare_event_extraction)
         self.graph_builder.add_node("commit_extracted_events_to_db", self.commit_extracted_events_to_db)
         self.graph_builder.add_node("print_events", self.print_events)
+        self.logger.info("🔍 Graph nodes added")
 
         # Build the graph
+        self.logger.info("🔍 About to add graph edges...")
         self.graph_builder.add_edge(START, "start_source_extraction")
 
         # Phase 1: Source extraction with map-reduce
@@ -816,9 +831,11 @@ class Scraper:
         # After commiting events to db, go to print_events
         self.graph_builder.add_edge("commit_extracted_events_to_db", "print_events")
         self.graph_builder.add_edge("print_events", END)
+        self.logger.info("🔍 Graph edges added")
 
+        self.logger.info("🔍 About to compile graph...")
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
-        self.logger.info("Graph compiled")
+        self.logger.info("🔍 Graph compiled successfully")
 
     async def test(self, semantic_content: str):
         self.logger.info(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))

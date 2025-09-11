@@ -1,6 +1,8 @@
 import asyncio
 import concurrent.futures
 import html
+import signal
+import threading
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -72,24 +74,34 @@ async def extract_sources_from_web(
 
     start_time = time.time()
 
-    async def newspaper_build_with_progress():
-        """Wrapper that logs progress during newspaper.build"""
+    def _build_newspaper_sync():
+        """Synchronous newspaper.build function that can be interrupted"""
         try:
-            logger.info("📰 Starting newspaper.build thread...")
+            return newspaper.build(scraping_source.base_url, only_in_path=True, config=config)
+        except Exception as e:
+            logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
+            raise
+
+    async def newspaper_build_with_progress():
+        """Wrapper that logs progress during newspaper.build with proper timeout and cleanup"""
+        try:
+            logger.info("📰 Starting newspaper.build in thread...")
             
-            # Use ProcessPoolExecutor for truly isolated execution
+            # Use ThreadPoolExecutor with asyncio.wait_for for clean timeout handling
             loop = asyncio.get_event_loop()
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                future = executor.submit(newspaper.build, scraping_source.base_url, only_in_path=True, config=config)
-                result = await loop.run_in_executor(None, lambda: future.result(timeout=120))
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, _build_newspaper_sync),
+                timeout=120
+            )
             
             logger.info("📰 newspaper.build thread completed successfully")
             return result
-        except concurrent.futures.TimeoutError:
-            logger.error("📰 newspaper.build process timed out after 120 seconds")
-            raise Exception("newspaper.build process timeout")
+        except asyncio.TimeoutError:
+            logger.error("📰 newspaper.build timed out after 120 seconds")
+            # The thread will be cleaned up automatically when the worker process exits
+            raise Exception("newspaper.build timeout")
         except Exception as e:
-            logger.error("📰 newspaper.build thread failed: <red>{e}</red>", e=e)
+            logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
             raise
 
     # Monitor progress every 30 seconds
@@ -100,6 +112,7 @@ async def extract_sources_from_web(
             elapsed = time.time() - start_time
             logger.info("⏱️  newspaper.build still running... {elapsed:.1f}s elapsed", elapsed=elapsed)
 
+    website = None
     try:
         # Start both the newspaper task and progress monitor
         newspaper_task = asyncio.create_task(newspaper_build_with_progress())
@@ -118,17 +131,21 @@ async def extract_sources_from_web(
             # Cancel both tasks
             newspaper_task.cancel()
             monitor_task.cancel()
-            logger.error(
-                "❌ TIMEOUT: newspaper.build took longer than 2 minutes for {url}", url=scraping_source.base_url
+            logger.warning(
+                "⚠️  TIMEOUT: newspaper.build took longer than 2 minutes for {url}, falling back to LLM-only parsing", 
+                url=scraping_source.base_url
             )
-            raise Exception(f"newspaper.build timed out for {scraping_source.base_url}")
+            website = None  # Force fallback to LLM parsing
 
     except Exception as e:
-        logger.error("❌ ERROR in newspaper.build for {url}: <red>{e}</red>", url=scraping_source.base_url, e=e)
-        raise
+        logger.warning(
+            "⚠️  ERROR in newspaper.build for {url}: <red>{e}</red> - falling back to LLM-only parsing", 
+            url=scraping_source.base_url, e=e
+        )
+        website = None  # Force fallback to LLM parsing
 
-    # If newspaper failed to propperly retrieve the articles listed on the page...
-    if len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
+    # If newspaper failed completely or didn't retrieve enough articles...
+    if website is None or len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
         # Parse the page AS an Article instead
         log = f"❌ Newspaper failed to retrieve scraping source <cyan>{scraping_source.id}</cyan> ({scraping_source.base_url}) as Website, falling back to LLM-assisted parsing."
         website = Article(scraping_source.base_url, memoize_articles=False, disable_category_cache=True)
