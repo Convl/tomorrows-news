@@ -76,11 +76,18 @@ async def extract_sources_from_web(
         """Wrapper that logs progress during newspaper.build"""
         try:
             logger.info("📰 Starting newspaper.build thread...")
-            result = await asyncio.to_thread(
-                newspaper.build, scraping_source.base_url, only_in_path=True, config=config
-            )
+            
+            # Use ProcessPoolExecutor for truly isolated execution
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                future = executor.submit(newspaper.build, scraping_source.base_url, only_in_path=True, config=config)
+                result = await loop.run_in_executor(None, lambda: future.result(timeout=120))
+            
             logger.info("📰 newspaper.build thread completed successfully")
             return result
+        except concurrent.futures.TimeoutError:
+            logger.error("📰 newspaper.build process timed out after 120 seconds")
+            raise Exception("newspaper.build process timeout")
         except Exception as e:
             logger.error("📰 newspaper.build thread failed: <red>{e}</red>", e=e)
             raise
