@@ -62,9 +62,14 @@ async def extract_sources_from_web(
     config = Config()
     config.memorize_articles = False
     config.disable_category_cache = True
-    config.thread_timeout_seconds = 115
-    website = None
-    
+    config.thread_timeout_seconds = 120
+
+    logger.info("🔄 About to call newspaper.build for {url}...", url=scraping_source.base_url)
+
+    # Create a task that we can monitor
+    import time
+
+    start_time = time.time()
 
     def _build_newspaper_sync():
         """Synchronous newspaper.build function that can be interrupted"""
@@ -74,8 +79,8 @@ async def extract_sources_from_web(
             logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
             raise
 
-    async def newspaper_build():
-        """Wrapper for newspaper.build"""
+    async def newspaper_build_with_progress():
+        """Wrapper that logs progress during newspaper.build with proper timeout and cleanup"""
         try:
             logger.info("📰 Starting newspaper.build in thread...")
             
@@ -88,27 +93,53 @@ async def extract_sources_from_web(
             
             logger.info("📰 newspaper.build thread completed successfully")
             return result
+        except asyncio.TimeoutError:
+            logger.error("📰 newspaper.build timed out after 120 seconds")
+            # The thread will be cleaned up automatically when the worker process exits
+            raise Exception("newspaper.build timeout")
         except Exception as e:
             logger.error("📰 newspaper.build failed: <red>{e}</red>", e=e)
             raise
 
-    newspaper_task = asyncio.create_task(newspaper_build())
+    # Monitor progress every 30 seconds
+    async def progress_monitor():
+        """Monitor and log progress every 30 seconds"""
+        while True:
+            await asyncio.sleep(30)
+            elapsed = time.time() - start_time
+            logger.info("⏱️  newspaper.build still running... {elapsed:.1f}s elapsed", elapsed=elapsed)
 
-    # Wait for newspaper task with timeout, cancel monitor when done
+    website = None
     try:
-        website = await asyncio.wait_for(newspaper_task, timeout=120)  # 2 minute timeout
-        logger.info(
-            "✅ newspaper.build completed for {url}, found {count} articles",
-            url=scraping_source.base_url,
-            count=len(website.articles),
-        )
-    except asyncio.TimeoutError:
-        # Cancel both tasks
-        newspaper_task.cancel()
+        # Start both the newspaper task and progress monitor
+        newspaper_task = asyncio.create_task(newspaper_build_with_progress())
+        monitor_task = asyncio.create_task(progress_monitor())
+
+        # Wait for newspaper task with timeout, cancel monitor when done
+        try:
+            website = await asyncio.wait_for(newspaper_task, timeout=120)  # 2 minute timeout
+            monitor_task.cancel()
+            logger.info(
+                "✅ newspaper.build completed for {url}, found {count} articles",
+                url=scraping_source.base_url,
+                count=len(website.articles),
+            )
+        except asyncio.TimeoutError:
+            # Cancel both tasks
+            newspaper_task.cancel()
+            monitor_task.cancel()
+            logger.warning(
+                "⚠️  TIMEOUT: newspaper.build took longer than 2 minutes for {url}, falling back to LLM-only parsing", 
+                url=scraping_source.base_url
+            )
+            website = None  # Force fallback to LLM parsing
+
+    except Exception as e:
         logger.warning(
-            "⚠️  TIMEOUT: newspaper.build took longer than 2 minutes for {url}, falling back to LLM-only parsing", 
-            url=scraping_source.base_url
+            "⚠️  ERROR in newspaper.build for {url}: <red>{e}</red> - falling back to LLM-only parsing", 
+            url=scraping_source.base_url, e=e
         )
+        website = None  # Force fallback to LLM parsing
 
     # If newspaper failed completely or didn't retrieve enough articles...
     if website is None or len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
