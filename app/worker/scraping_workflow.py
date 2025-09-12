@@ -472,15 +472,15 @@ class Scraper:
                 id=state.scraping_source.id,
                 base_url=state.scraping_source.base_url,
             )
-            
+
             try:
                 sources = await asyncio.wait_for(
                     web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service),
-                    timeout=300  # 5 minute timeout
+                    timeout=300,  # 5 minute timeout
                 )
 
                 sources = await self.deduplicate_sources(sources, state.scraping_source)
-                
+
                 return {"sources": sources}
             except asyncio.TimeoutError:
                 self.logger.error("❌ TIMEOUT: web_sources_from_scraping_source took longer than 5 minutes")
@@ -735,47 +735,52 @@ class Scraper:
 
             # hack to ensure scraping jobs don't run twice when the local dev server is up
             if not settings.IS_DEV_SERVER:
-                await asyncio.sleep(5) 
+                await asyncio.sleep(5)
                 await db.refresh(scraping_source)
 
             if scraping_source.currently_scraping:
                 raise Exception("Scraping source is currently scraping")
-                
 
             scraping_source.currently_scraping = True
             db.add(scraping_source)
             await db.commit()
             await db.refresh(scraping_source)
 
-            
             current_topic = (
                 (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
             )
-            
+
             current_user = (
                 (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
             )
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
-            
+
+            self.logger = self.logger.bind(
+                topic_id=current_topic.id,
+                topic_name=current_topic.name,
+                source_name=scraping_source.name,
+                user_id=current_user.id,
+                is_demo_user=is_demo_user,
+            )
 
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
-        
+
         # Initialize LLM service
         self.llm_service = LlmService(is_demo_user=is_demo_user)
-        
+
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-3-small", api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
-        
+
         # Setup initial state and graph
         self.scraping_state = ScrapingState(
             scraping_source=scraping_source_workflow,
             sources=[],
             events=[],
         )
-        
+
         self.graph_builder = StateGraph(ScrapingState)
-        
+
         # Add nodes
         self.graph_builder.add_node("start_source_extraction", self.start_source_extraction)
         self.graph_builder.add_node("extract_sources_from_single_source", self.extract_sources_from_single_source)
@@ -783,7 +788,7 @@ class Scraper:
         self.graph_builder.add_node("prepare_event_extraction", self.prepare_event_extraction)
         self.graph_builder.add_node("commit_extracted_events_to_db", self.commit_extracted_events_to_db)
         self.graph_builder.add_node("print_events", self.print_events)
-        
+
         # Build the graph
         self.graph_builder.add_edge(START, "start_source_extraction")
 
@@ -814,7 +819,7 @@ class Scraper:
         # After commiting events to db, go to print_events
         self.graph_builder.add_edge("commit_extracted_events_to_db", "print_events")
         self.graph_builder.add_edge("print_events", END)
-        
+
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
         self.logger.info("Graph compiled successfully")
 
