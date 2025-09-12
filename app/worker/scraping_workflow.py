@@ -476,7 +476,7 @@ class Scraper:
             try:
                 sources = await asyncio.wait_for(
                     web_sources_from_scraping_source(state.scraping_source, self.logger, self.llm_service),
-                    timeout=300,  # 5 minute timeout
+                    timeout=600,  # 10 minute timeout
                 )
 
                 sources = await self.deduplicate_sources(sources, state.scraping_source)
