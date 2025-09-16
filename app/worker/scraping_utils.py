@@ -133,6 +133,8 @@ async def extract_sources_from_web(
             source = await download_and_parse_article(article.url, degrees_of_separation=1, logger=logger)
             if source and source.date >= scraping_source.last_scraped_at:
                 sources.append(source)
+            else:
+                logger.info("❌ Article <cyan>{url}</cyan> has date <yellow>{article_date}</yellow>. That is invalid or older than last scrape date (<yellow>{last_scraped_at}</yellow>). Skipping.", url=article.url, article_date=source.date, last_scraped_at=scraping_source.last_scraped_at)
             await asyncio.sleep(0.1)
 
     return sources

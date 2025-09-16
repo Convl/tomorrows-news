@@ -1,1 +1,1 @@
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --timeout 3600 --graceful-timeout 600
+gunicorn -w 1 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --timeout 3600 --graceful-timeout 600

@@ -5,6 +5,7 @@ from app.core.custom_logging import create_logger
 
 create_logger()
 
+import os
 from contextlib import asynccontextmanager
 
 import uvicorn

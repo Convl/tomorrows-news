@@ -4,11 +4,12 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, defer
 
 from app.core.auth import current_active_user
 from app.database import get_db
 from app.models.event import EventDB
+from app.models.extracted_event import ExtractedEventDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
 from app.schemas.event import EventCreate, EventResponse, EventSummary, EventUpdate
@@ -80,8 +81,8 @@ async def list_events(
     if from_date is None:
         from_date = datetime.now(timezone.utc) - timedelta(hours=2)
 
-    # Base query
-    query = select(EventDB)
+    # Base query - exclude vector data
+    query = select(EventDB).options(defer(EventDB.semantic_vector))
 
     # Access control and topic scoping
     if topic_id is not None:
@@ -109,8 +110,7 @@ async def list_events(
     conditions = [EventDB.date >= from_date]
     if to_date is not None:
         conditions.append(EventDB.date <= to_date)
-    if conditions:
-        query = query.where(and_(*conditions))
+    query = query.where(and_(*conditions))
 
     # Ordering and pagination
     query = query.order_by(EventDB.date.asc()).offset(skip).limit(limit)
@@ -127,7 +127,10 @@ async def list_events(
             (
                 await db.execute(
                     select(EventDB)
-                    .options(selectinload(EventDB.extracted_events))
+                    .options(
+                        defer(EventDB.semantic_vector),
+                        selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector)
+                    )
                     .where(EventDB.id.in_(ids))
                     .order_by(EventDB.date.asc())
                 )
