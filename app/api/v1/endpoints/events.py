@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from loguru import logger
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, defer
+from sqlalchemy.orm import defer, selectinload
 
 from app.core.auth import current_active_user
 from app.database import get_db
@@ -56,8 +57,9 @@ async def get_event(
 
 @router.get("/", response_model=List[EventResponse])
 async def list_events(
+    request: Request,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, le=1000),
+    limit: Annotated[int, Query(le=1000)] = 100,
     topic_id: Optional[int] = Query(None),
     verified_only: bool = Query(False),
     exclude_duplicates: bool = Query(True),
@@ -76,6 +78,13 @@ async def list_events(
     - include_extracted controls whether extracted events are eagerly loaded; for simplicity and to avoid lazy-load errors,
       we always eager-load extracted events in the response model.
     """
+
+    logger.info(
+        "Requested listing events from user {user_email} (id: {user_id}) and IP {user_ip}",
+        user_email=current_user.email,
+        user_id=current_user.id,
+        user_ip=request.client.host,
+    )
 
     # Default window: small look-back buffer (2 hours)
     if from_date is None:
@@ -129,7 +138,7 @@ async def list_events(
                     select(EventDB)
                     .options(
                         defer(EventDB.semantic_vector),
-                        selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector)
+                        selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector),
                     )
                     .where(EventDB.id.in_(ids))
                     .order_by(EventDB.date.asc())

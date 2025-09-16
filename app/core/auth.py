@@ -22,7 +22,7 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate  # noqa: F401
 
 # JWT Configuration
 SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-# Default to 30 days unless overridden by environment
+# Default to 30 days
 JWT_LIFETIME_SECONDS = int(os.getenv("JWT_LIFETIME_SECONDS", "2592000"))
 
 # Bearer transport (Authorization: Bearer <token>)
