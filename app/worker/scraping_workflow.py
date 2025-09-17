@@ -494,11 +494,17 @@ class Scraper:
     async def deduplicate_sources(self, sources: list[WebSourceBase], scraping_source: ScrapingSourceDB):
         """Remove duplicate sources from the list."""
         duplicates = 0
+        none_results = 0
         async with get_db_session() as db:
             for i in range(len(sources) - 1, -1, -1):
                 source = sources[i]
 
-                if source is None or not isinstance(source.date, datetime.datetime):
+                if source is None:
+                    none_results += 1
+                    sources.pop(i)
+                    continue
+
+                if not isinstance(source.date, datetime.datetime):
                     self.logger.info(
                         "❌ Dropping source {url} as it has no valid date",
                         url=source.url,
@@ -530,11 +536,12 @@ class Scraper:
                     sources.pop(i)
 
             self.logger.info(
-                "✅ Found <yellow>{total}</yellow> sources for Scraping Source <cyan>{id}</cyan> ({base_url}), out of which <yellow>{duplicates}</yellow> were dropped as duplicates and <yellow>{remaining}</yellow> were kept.",
+                "✅ Found <yellow>{total}</yellow> sources for Scraping Source <cyan>{id}</cyan> ({base_url}), out of which <yellow>{duplicates}</yellow> were dropped as duplicates, <yellow>{none_results}</yellow> were dropped as None, and <yellow>{remaining}</yellow> were kept.",
                 total=len(sources) + duplicates,
                 id=scraping_source.id,
                 base_url=scraping_source.base_url,
                 duplicates=duplicates,
+                none_results=none_results,
                 remaining=len(sources),
             )
             return sources
