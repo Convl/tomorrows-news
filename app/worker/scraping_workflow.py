@@ -498,7 +498,7 @@ class Scraper:
             for i in range(len(sources) - 1, -1, -1):
                 source = sources[i]
 
-                if not isinstance(source.date, datetime.datetime):
+                if source is None or not isinstance(source.date, datetime.datetime):
                     self.logger.info(
                         "❌ Dropping source {url} as it has no valid date",
                         url=source.url,
