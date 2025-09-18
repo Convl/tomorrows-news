@@ -861,4 +861,14 @@ class Scraper:
                 source_id=source_id,
                 e=e,
             )
+            async with get_db_session() as db:
+                scraping_source: ScrapingSourceDB = (
+                    (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.id == source_id)))
+                    .scalars()
+                    .first()
+                )
+                scraping_source.currently_scraping = False
+                db.add(scraping_source)
+                await db.commit()
+                await db.refresh(scraping_source)
             raise  # so apscheduler logs the failure
