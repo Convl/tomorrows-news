@@ -12,6 +12,7 @@ from fastapi_users.authentication import (
     JWTStrategy,
 )
 from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -20,22 +21,20 @@ from app.database import get_db
 from app.models.user import UserDB
 from app.schemas.user import UserCreate, UserRead, UserUpdate  # noqa: F401
 
-# JWT Configuration
-SECRET = os.getenv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production")
-# Default to 30 days
-JWT_LIFETIME_SECONDS = int(os.getenv("JWT_LIFETIME_SECONDS", "2592000"))
-
-# Bearer transport (Authorization: Bearer <token>)
-# Ensure tokenUrl matches the API prefix so Swagger "Authorize" works
-bearer_transport = BearerTransport(tokenUrl=f"{settings.API_V1_STR}/auth/jwt/login")
+# Strategy config (JWT)
+SECRET = settings.JWT_SECRET.get_secret_value()
+JWT_LIFETIME_SECONDS = settings.JWT_LIFETIME_SECONDS
 
 
-# JWT Strategy
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(secret=SECRET, lifetime_seconds=JWT_LIFETIME_SECONDS)
 
 
-# Authentication backend
+# Transport config (Bearer)
+bearer_transport = BearerTransport(tokenUrl=f"{settings.API_V1_STR}/auth/jwt/login")
+
+
+# Authentication backend config (Strategy + Transport)
 auth_backend = AuthenticationBackend(
     name="jwt",
     transport=bearer_transport,
@@ -43,47 +42,41 @@ auth_backend = AuthenticationBackend(
 )
 
 
+# User Manager config
 class UserManager(UUIDIDMixin, BaseUserManager[UserDB, uuid.UUID]):
     """Custom user manager for additional logic."""
 
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
-    async def on_after_register(self, user: UserDB, request: Optional[Request] = None):
+    async def on_after_register(self, user: UserDB, request: Request | None = None):
         """Called after a user registers."""
-        print(f"User {user.id} has registered.")
+        logger.info("User <yellow>{user_id}</yellow> has registered.", user_id=user.id)
 
         # Automatically send verification email for new users
         if not user.is_verified:
-            try:
-                await self.request_verify(user, request)
-                print(f"Verification email sent to {user.email}")
-            except Exception as e:
-                print(f"Failed to send verification email to {user.email}: {e}")
+            await EmailService.send_verification_email(user.email, user.id)
 
-    async def on_after_forgot_password(self, user: UserDB, token: str, request: Optional[Request] = None):
+    async def on_after_forgot_password(self, user: UserDB, token: str, request: Request | None = None):
         """Called after a user requests password reset."""
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+        logger.info(
+            "User <yellow>{user_id}</yellow> has forgot their password. Reset token: <yellow>{token}</yellow>",
+            user_id=user.id,
+            token=token,
+        )
+        await EmailService.send_password_reset_email(user.email, token)
 
-        # Send password reset email
-        success = await EmailService.send_password_reset_email(user.email, token)
-        if success:
-            print(f"Password reset email sent to {user.email}")
-        else:
-            print(f"Failed to send password reset email to {user.email}")
-
-    async def on_after_request_verify(self, user: UserDB, token: str, request: Optional[Request] = None):
+    async def on_after_request_verify(self, user: UserDB, token: str, request: Request | None = None):
         """Called after a user requests verification."""
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
-
-        # Send verification email
-        success = await EmailService.send_verification_email(user.email, token)
-        if success:
-            print(f"Verification email sent to {user.email}")
-        else:
-            print(f"Failed to send verification email to {user.email}")
+        logger.info(
+            "Verification requested for user <yellow>{user_id}</yellow>. Verification token: <yellow>{token}</yellow>",
+            user_id=user.id,
+            token=token,
+        )
+        await EmailService.send_verification_email(user.email, token)
 
 
+# User / User Manager dependencies
 async def get_user_db(session: AsyncSession = Depends(get_db)):
     """Get user database adapter."""
     yield SQLAlchemyUserDatabase(session, UserDB)

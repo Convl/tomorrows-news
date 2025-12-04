@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,7 +12,13 @@ from app.worker.scheduler import scheduler
 router = APIRouter()
 
 
-@router.post("/debug/trigger-job/{source_id}")
+@router.get("/frontend")
+async def debug_frontend():
+    await asyncio.sleep(3)
+    return {"message": "Connection to backend established"}
+
+
+@router.post("/trigger-job/{source_id}")
 async def debug_trigger_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
     """Trigger a job for a scraping source"""
     if not current_user.is_superuser:
@@ -21,7 +28,7 @@ async def debug_trigger_job(source_id: int, current_user: UserDB = Depends(curre
     return {"message": f"Job {job_id} scheduled to run in 30 seconds"}
 
 
-@router.get("/debug/get-jobs")
+@router.get("/get-jobs")
 async def get_jobs(current_user: UserDB = Depends(current_active_user)):
     """Get all jobs"""
     if not current_user.is_superuser:
@@ -38,7 +45,7 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
     ]
 
 
-@router.delete("/debug/delete-scraping-job/{source_id}")
+@router.delete("/delete-scraping-job/{source_id}")
 async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
     """Delete a scraping job for a scraping source"""
     if not current_user.is_superuser:
@@ -47,7 +54,7 @@ async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(cur
     return {"message": f"Job {f'scraping_source_{source_id}'} deleted"}
 
 
-@router.get("/debug")
+@router.get("/")
 async def dbg(current_user: UserDB = Depends(current_active_user)):
     """Debug endpoint, used for testing various things"""
     logger.info("This <red>is</red> a <yellow>test</yellow> message")
@@ -62,7 +69,6 @@ async def dbg(current_user: UserDB = Depends(current_active_user)):
     from app.database import get_db_session
     from app.models import ScrapingSourceDB
     from app.worker.scheduler import scheduler
-
 
     # Clear test data before running scraper
     # from sqlalchemy import delete, select

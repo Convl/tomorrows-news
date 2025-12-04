@@ -1,7 +1,16 @@
 import datetime
 from typing import TYPE_CHECKING, Any, Dict
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, event
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    event,
+)
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -24,7 +33,8 @@ class ScrapingSourceDB(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)  # "BBC Court News"
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)  # "https://bbc.com/news/court"
     source_type: Mapped[ScrapingSourceEnum] = mapped_column(
-        SqlEnum(ScrapingSourceEnum, values_callable=get_enum_values), nullable=False
+        SqlEnum(ScrapingSourceEnum, values_callable=get_enum_values),
+        nullable=False,
     )
 
     # Optional metadata
@@ -44,7 +54,9 @@ class ScrapingSourceDB(Base):
     scraping_frequency: Mapped[int] = mapped_column(Integer, nullable=False, default=60000)  # Frequency in minutes
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_scraped_at: Mapped[datetime.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=datetime.datetime(1900, 1, 1)
+        DateTime(timezone=True),
+        nullable=True,
+        default=datetime.datetime(1900, 1, 1),
     )
     currently_scraping: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
 
@@ -54,13 +66,19 @@ class ScrapingSourceDB(Base):
 
     # ExtractedEvents extracted via this ScrapingSource
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
-        "ExtractedEventDB", back_populates="scraping_source", cascade="all, delete-orphan", lazy="raise"
+        "ExtractedEventDB",
+        back_populates="scraping_source",
+        cascade="all, delete-orphan",
+        lazy="raise",
     )
 
     # Sources extracted via this ScrapingSource
-    # TODO: Reconsider this relationship, especially the cascade part. 
+    # TODO: Reconsider this relationship, especially the cascade part.
     sources: Mapped[list["WebSourceDB"]] = relationship(
-        "WebSourceDB", back_populates="scraping_source", cascade="all, delete-orphan", lazy="raise"
+        "WebSourceDB",
+        back_populates="scraping_source",
+        cascade="all, delete-orphan",
+        lazy="raise",
     )
 
     # Timestamps

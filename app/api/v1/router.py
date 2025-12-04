@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, debug, events, scraping_sources, topics, users
+from app.api.v1.endpoints import auth, debug, events, scraping_sources, topics
 
 api_router = APIRouter()
 
@@ -10,9 +10,8 @@ api_router.include_router(auth.register_router, prefix="/auth", tags=["auth"])
 api_router.include_router(auth.reset_password_router, prefix="/auth", tags=["auth"])
 api_router.include_router(auth.verify_router, prefix="/auth", tags=["auth"])
 
-
 # User management routes (protected)
-api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(auth.users_router, prefix="/users", tags=["users"])
 
 # Business logic routes
 api_router.include_router(topics.router, prefix="/topics", tags=["topics"])

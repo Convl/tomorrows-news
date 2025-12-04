@@ -5,6 +5,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
 
+from loguru import logger
+
 from app.core.config import settings
 
 
@@ -54,11 +56,10 @@ class EmailService:
 
             return True
         except Exception as e:
-            print(f"Failed to send email: {e}")
+            logger.error("Failed to send email: <yellow>{error}</yellow>", error=e)
             return False
 
-    @staticmethod
-    async def send_verification_email(email: str, token: str) -> bool:
+    async def send_verification_email(self, email: str, token: str) -> bool:
         """Send verification email to user."""
         verification_url = f"{settings.FRONTEND_URL}/auth/verify.html?token={token}"
 

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PYTHONASYNCIODEBUG: bool = False
     FILTER_LIBRARY_TRACEBACKS: bool = False  # Workaround to only show tracebacks from app code, not libraries
-    
+
     # Server priority for scraping jobs
     IS_DEV_SERVER: bool = False
 
@@ -60,12 +60,16 @@ class Settings(BaseSettings):
     DEMO_USER_EMAIL: str
 
     JWT_SECRET: SecretStr
+    JWT_LIFETIME_SECONDS: int = (
+        2592000  # 30 days, TODO: shorten this, add access / refresh tokens via fastapi-jwt-auth?
+    )
 
     # API settings
     API_V1_STR: str = "/api/v1"
 
     # CORS settings
     CORS_ALLOW_ORIGINS: list[str] = [
+        "http://localhost:5173",
         "http://localhost:3000",
         "http://localhost:8080",
         "http://localhost:8000",

@@ -17,7 +17,7 @@ class UserDB(Base, SQLAlchemyBaseUserTableUUID):
 
     # FastAPI-Users provides: id (UUID), email, hashed_password, is_active, is_superuser, is_verified
     # Additional custom fields
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    # email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     first_name: Mapped[str] = mapped_column(String(255), nullable=True)
     last_name: Mapped[str] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
