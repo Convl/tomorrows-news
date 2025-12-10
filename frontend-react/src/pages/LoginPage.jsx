@@ -85,7 +85,10 @@ export default function LoginPage() {
             required
             name="password"
           ></TextField>
-          <Typography sx={{ mt: 1 }} color={error ? "red" : "inherit"}>
+          <Typography
+            sx={{ mt: 1 }}
+            color={error ? "error.main" : "text.primary"}
+          >
             {loading ? "Logging in..." : error ?? ""}
           </Typography>
           <Button type="submit" variant="contained" fullWidth sx={{ mt: 2 }}>

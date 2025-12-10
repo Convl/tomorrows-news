@@ -59,6 +59,7 @@ class EmailService:
             logger.error("Failed to send email: <yellow>{error}</yellow>", error=e)
             return False
 
+    @staticmethod
     async def send_verification_email(self, email: str, token: str) -> bool:
         """Send verification email to user."""
         verification_url = f"{settings.FRONTEND_URL}/auth/verify.html?token={token}"

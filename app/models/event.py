@@ -1,8 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, Interval
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, Interval, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -30,11 +30,21 @@ class EventDB(Base):
     additional_infos: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
 
     # Provenance fields. Title and description may be composites. Location and duration are optional.
-    title_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
-    description_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
-    date_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
-    location_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
-    duration_from_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True)
+    title_from_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True
+    )
+    description_from_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True
+    )
+    date_from_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True
+    )
+    location_from_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True
+    )
+    duration_from_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("extracted_events.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Confidence
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)

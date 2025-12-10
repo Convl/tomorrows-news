@@ -21,4 +21,3 @@ class UserCreate(schemas.BaseUserCreate):
 class UserUpdate(schemas.BaseUserUpdate):
     first_name: str
     last_name: str
-    updated_at: datetime = datetime.now()

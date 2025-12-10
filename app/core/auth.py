@@ -1,8 +1,6 @@
 """Authentication configuration for FastAPI-Users."""
 
-import os
 import uuid
-from typing import Optional
 
 from fastapi import Depends, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -55,7 +53,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserDB, uuid.UUID]):
 
         # Automatically send verification email for new users
         if not user.is_verified:
-            await EmailService.send_verification_email(user.email, user.id)
+            await self.request_verify(user, request)
 
     async def on_after_forgot_password(self, user: UserDB, token: str, request: Request | None = None):
         """Called after a user requests password reset."""

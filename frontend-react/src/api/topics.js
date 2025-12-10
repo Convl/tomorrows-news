@@ -8,6 +8,7 @@ export function useTopics() {
       const { data } = await apiClient.get("/topics");
       return data;
     },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

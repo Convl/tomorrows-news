@@ -41,7 +41,7 @@ class ScrapingSourceUpdate(BaseModel):
     language: str | None = Field(None, max_length=100)
     language_code: str | None = Field(None, max_length=2)
     description: str | None = None
-    degrees_of_separation: int | None = Field(None, ge=0)
+    degrees_of_separation: int | None = Field(None, ge=0, le=2)
     scraping_config: Dict[str, Any] | None = None
     scraping_frequency: int | None = Field(None, ge=1)  # Frequency in minutes, minimum 1
     is_active: bool | None = None

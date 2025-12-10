@@ -33,7 +33,7 @@ export default function AuthProvider({ children }) {
         setLoading(false);
         navigate("/login");
       });
-  }, []);
+  }, [navigate]);
 
   const login = (loggedInUser) => setUser(loggedInUser);
   const logout = () => {
