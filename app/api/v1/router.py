@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, debug, events, scraping_sources, topics
+from app.api.v1.endpoints import auth, debug, events, scraping_sources, sse_stream, topics
 
 api_router = APIRouter()
 
@@ -12,6 +12,9 @@ api_router.include_router(auth.verify_router, prefix="/auth", tags=["auth"])
 
 # User management routes (protected)
 api_router.include_router(auth.users_router, prefix="/users", tags=["users"])
+
+# SSE Streaming route
+api_router.include_router(sse_stream.router, tags=["stream"])
 
 # Business logic routes
 api_router.include_router(topics.router, prefix="/topics", tags=["topics"])

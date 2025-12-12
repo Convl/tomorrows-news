@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     event,
+    except_,
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -99,23 +100,31 @@ class ScrapingSourceDB(Base):
             )
         return f"scraping_source_{self.id}"
 
-    def schedule_job(self):
+    def schedule_job(self, run_immediately=False):
         """Schedule job for this source if it is active"""
         # Only schedule if source is active
-        if self.is_active:
+        if self.is_active and self.id != 54:  # TODO: Remove second condition, just used for testing
             from apscheduler.triggers.interval import IntervalTrigger
 
             from app.worker.scheduler import scheduler
             from app.worker.scraper import Scraper
 
             print(f"Scheduling job for source {self.id} with {self.scraping_frequency} minute interval")
+            now = datetime.datetime.now(datetime.timezone.utc)
             scheduler.add_job(
                 func=Scraper.scrape_source,
                 args=[self.id],
                 trigger=IntervalTrigger(minutes=self.scraping_frequency),
                 id=self.job_id,
                 jobstore=self.jobstore,
-                next_run_time=datetime.datetime.now(datetime.timezone.utc),
+                next_run_time=now
+                if (
+                    run_immediately
+                    or self.last_scraped_at is None
+                    or self.last_scraped_at == datetime.datetime(1900, 1, 1)
+                    or self.last_scraped_at + datetime.timedelta(minutes=self.scraping_frequency) < now
+                )
+                else self.last_scraped_at + datetime.timedelta(minutes=self.scraping_frequency),
                 executor="scraping",  # Use the async executor
                 replace_existing=True,
                 max_instances=1,
@@ -128,7 +137,15 @@ class ScrapingSourceDB(Base):
         try:
             scheduler.remove_job(self.job_id, jobstore=self.jobstore)
         except Exception:
-            pass
+            raise
+
+    def set_next_runtime(self, runtime):
+        from app.worker.scheduler import scheduler
+
+        try:
+            scheduler.modify_job(self.job_id, self.jobstore, next_run_time=runtime)
+        except Exception as e:
+            raise
 
     def update_job(self):
         """Update job only if necessary"""

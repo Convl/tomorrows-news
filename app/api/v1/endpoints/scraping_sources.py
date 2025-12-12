@@ -1,22 +1,24 @@
+import datetime
 from typing import List
 
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from loguru import logger
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.status import HTTP_409_CONFLICT
 
 from app.core.auth import current_active_user
 from app.database import get_db
 from app.models.event import EventDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.scraping_source import ScrapingSourceDB
-from app.models.websource import WebSourceDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
+from app.models.websource import WebSourceDB
 from app.schemas.scraping_source import ScrapingSourceCreate, ScrapingSourceResponse, ScrapingSourceUpdate
 from app.worker.scheduler import scheduler
-from loguru import logger
 
 router = APIRouter()
 
@@ -29,7 +31,7 @@ async def create_scraping_source(
 ):
     """Create a new scraping source"""
     # Validate topic exists
-    
+
     topic = (
         (
             await db.execute(
@@ -144,6 +146,30 @@ async def update_scraping_source(
     return source
 
 
+@router.post("/{source_id}/trigger-scrape")
+async def trigger_scrape(
+    source_id: int,
+    current_user: UserDB = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(ScrapingSourceDB)
+        .join(TopicDB)
+        .where(TopicDB.id == ScrapingSourceDB.topic_id)
+        .where(ScrapingSourceDB.id == source_id)
+    )
+    if not current_user.is_superuser:
+        query = query.where(TopicDB.user_id == current_user.id)
+    source = (await db.execute(query)).scalars().first()
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found")
+    if source.currently_scraping:
+        raise HTTPException(status_code=HTTP_409_CONFLICT, detail="Source is already being scraped.")
+    # source.set_next_runtime(datetime.datetime.now()) does not work for some reason, so we need to delete and re-recreate
+    source.remove_job()
+    source.schedule_job(run_immediately=True)
+
+
 @router.delete("/{source_id}")
 async def delete_scraping_source(
     source_id: int,
@@ -166,21 +192,26 @@ async def delete_scraping_source(
     if not source:
         log += "\n❌ ERROR: Scraping source not found or belongs to another user"
         logger.warning(log)
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found or belongs to another user")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Scraping source not found or belongs to another user"
+        )
 
-    affected_extracted_event_ids = (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.scraping_source_id == source_id))).scalars().all()
+    affected_extracted_event_ids = (
+        (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.scraping_source_id == source_id)))
+        .scalars()
+        .all()
+    )
     log += f"\nIDS of ExtractedEvents that got deleted as a result: {', '.join(map(str, affected_extracted_event_ids))}"
 
-    affected_web_source_ids = (await db.execute(select(WebSourceDB.id).where(WebSourceDB.scraping_source_id == source_id))).scalars().all()
+    affected_web_source_ids = (
+        (await db.execute(select(WebSourceDB.id).where(WebSourceDB.scraping_source_id == source_id))).scalars().all()
+    )
     log += f"\nIDS of WebSources that got deleted as a result: {', '.join(map(str, affected_web_source_ids))}"
 
     # Get event IDs that may become orphaned after deletion
     event_ids_query = (
         select(ExtractedEventDB.event_id)
-        .where(
-            ExtractedEventDB.scraping_source_id == source_id,
-            ExtractedEventDB.event_id.isnot(None)
-        )
+        .where(ExtractedEventDB.scraping_source_id == source_id, ExtractedEventDB.event_id.isnot(None))
         .distinct()
     )
     potentially_orphaned_event_ids = (await db.execute(event_ids_query)).scalars().all()
@@ -188,22 +219,17 @@ async def delete_scraping_source(
 
     # Delete the scraping source (cascades to extracted_events)
     await db.delete(source)
-    await db.flush()  
+    await db.flush()
 
     # For each potentially orphaned event, check if it has any remaining extracted_events. Delete if it doesnt.
     if potentially_orphaned_event_ids:
         for event_id in potentially_orphaned_event_ids:
             remaining_extracted_events = (
-                await db.execute(
-                    select(func.count(ExtractedEventDB.id))
-                    .where(ExtractedEventDB.event_id == event_id)
-                )
+                await db.execute(select(func.count(ExtractedEventDB.id)).where(ExtractedEventDB.event_id == event_id))
             ).scalar()
-            
+
             if remaining_extracted_events == 0:
-                orphaned_event = (
-                    await db.execute(select(EventDB).where(EventDB.id == event_id))
-                ).scalars().first()
+                orphaned_event = (await db.execute(select(EventDB).where(EventDB.id == event_id))).scalars().first()
                 if orphaned_event:
                     orphaned_event_ids.append(orphaned_event.id)
                     await db.delete(orphaned_event)

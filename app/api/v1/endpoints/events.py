@@ -179,29 +179,8 @@ async def list_events(
         return results
 
 
-@router.put("/{event_id}", response_model=EventResponse)
-async def update_event(event_id: int, event_update: EventUpdate, db: AsyncSession = Depends(get_db)):
-    """Update an event"""
-    # TODO: Implement event update logic
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Event update not implemented yet")
-
-
 @router.delete("/{event_id}")
 async def delete_event(event_id: int, db: AsyncSession = Depends(get_db)):
     """Delete an event"""
     # TODO: Implement event deletion logic
     raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Event deletion not implemented yet")
-
-
-@router.get("/similar/{event_id}", response_model=List[EventSummary])
-async def find_similar_events(event_id: int, limit: int = Query(10, le=50), db: AsyncSession = Depends(get_db)):
-    """Find similar events for deduplication purposes"""
-    # TODO: Implement similarity search using vector embeddings
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Similar event search not implemented yet")
-
-
-@router.post("/{event_id}/verify")
-async def verify_event(event_id: int, db: AsyncSession = Depends(get_db)):
-    """Mark an event as verified"""
-    # TODO: Implement event verification logic
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Event verification not implemented yet")

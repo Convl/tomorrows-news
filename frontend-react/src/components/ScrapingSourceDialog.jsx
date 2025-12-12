@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ScrapingSourceForm from "./ScrapingSourceForm";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import {
   useCreateScrapingSource,
   useUpdateScrapingSource,
@@ -200,31 +201,12 @@ export default function ScrapingSourceDialog({
 
       {/* Delete Confirmation Dialog */}
       {deleteDialogOpen && (
-        <Dialog open={true} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Delete Feed</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              ⚠️ Are you sure you want to delete "{sourceToEdit?.name}"?
-              <br />
-              <br />
-              This action cannot be undone. It will stop all scheduled scraping
-              for this feed, delete the feed and all events that have been
-              extracted from it.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleDelete}
-              color="error"
-              variant="contained"
-              disabled={isPending}
-              startIcon={isPending ? <CircularProgress size={20} /> : null}
-            >
-              {isPending ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <DeleteConfirmationDialog
+          name={sourceToEdit?.name}
+          handleClose={() => setDeleteDialogOpen(false)}
+          handleDelete={handleDelete}
+          isPending={isPending}
+        />
       )}
     </>
   );

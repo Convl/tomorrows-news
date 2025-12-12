@@ -1,12 +1,29 @@
 import { Paper, Box, Typography, Chip, IconButton } from "@mui/material";
+import { amber } from "@mui/material/colors";
 import PublicIcon from "@mui/icons-material/Public";
 import RssFeedIcon from "@mui/icons-material/RssFeed";
 import ApiIcon from "@mui/icons-material/Api";
 import LinkIcon from "@mui/icons-material/Link";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ToggleOnIcon from "@mui/icons-material/ToggleOn";
+import ToggleOffIcon from "@mui/icons-material/ToggleOff";
+import UpdateIcon from "@mui/icons-material/Update";
+import {
+  useUpdateScrapingSource,
+  useScrapeScrapingSourceNow,
+} from "../api/scrapingsources";
+import { useDeleteScrapingSource } from "../api/scrapingsources";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
+import React from "react";
 
 // individual scraping source card component
 export default function ScrapingSourceCard({ source, onEdit }) {
+  const updateScrapingSource = useUpdateScrapingSource();
+  const triggerScrape = useScrapeScrapingSourceNow();
+  const deleteScrapingSource = useDeleteScrapingSource();
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+
   //Display time interval (since last scrape / until next scrape / overdue since) in two highest divisible units
   function formatTimeInterval(ms) {
     let result = "";
@@ -15,6 +32,7 @@ export default function ScrapingSourceCard({ source, onEdit }) {
       days: 86400000,
       hours: 3600000,
       minutes: 60000,
+      seconds: 10000,
     };
     for (const [unit, value] of Object.entries(units)) {
       if (ms >= value && matched < 2) {
@@ -51,7 +69,7 @@ export default function ScrapingSourceCard({ source, onEdit }) {
       statusText = `Currently scraping • Last scraped: ${
         lastScrapedFormatted ? `${lastScrapedFormatted} ago` : "never"
       }`;
-      statusColor = "warning.main";
+      statusColor = amber[700];
     } else if (lastScrapedDate) {
       const nextDueDate = new Date(
         lastScrapedDate.getTime() + scrapingFrequencyMs
@@ -93,57 +111,112 @@ export default function ScrapingSourceCard({ source, onEdit }) {
     );
 
   return (
-    <Paper
-      sx={{
-        p: 2,
-        border: 1,
-        borderColor: "divider",
-        "&:hover": {
-          bgcolor: "action.hover",
-        },
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
-        <Box sx={{ color: "primary.main", pt: 0.5 }}>{sourceIcon}</Box>
-        <Box sx={{ flex: 1 }}>
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              mb: 0.5,
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              {source.name}
-            </Typography>
-            <Chip
-              label={source.source_type}
-              size="small"
-              variant="outlined"
-              sx={{ height: 20, fontSize: "0.7rem" }}
-            />
-            <Typography
-              variant="caption"
-              sx={{ color: statusColor, fontSize: "0.75rem" }}
+    <>
+      <Paper
+        sx={{
+          p: 2,
+          border: 1,
+          borderColor: "divider",
+          "&:hover": {
+            bgcolor: "action.hover",
+          },
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+          <Box sx={{ color: "primary.main", pt: 0.5 }}>{sourceIcon}</Box>
+          <Box sx={{ flex: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                mb: 0.5,
+                flexWrap: "wrap",
+              }}
             >
-              {statusDot} {statusText}
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {source.name}
+              </Typography>
+              <Chip
+                label={source.source_type}
+                size="small"
+                variant="outlined"
+                sx={{ height: 20, fontSize: "0.7rem" }}
+              />
+              <Typography
+                variant="caption"
+                sx={{ color: statusColor, fontSize: "0.75rem" }}
+              >
+                {statusDot} {statusText}
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {source.base_url}
             </Typography>
           </Box>
-          <Typography variant="body2" color="text.secondary">
-            {source.base_url}
-          </Typography>
+          {/* <IconButton
+            size="small"
+            color={source.is_active ? "primary" : "grey"}
+            sx={{ alignSelf: "flex-start" }}
+            onClick={async () =>
+              await updateScrapingSource.mutateAsync({
+                sourceId: source.id,
+                data: { is_active: !source.is_active },
+              })
+            }
+          >
+            {source.is_active ? (
+              <ToggleOnIcon fontSize="small" />
+            ) : (
+              <ToggleOffIcon fontSize="small" />
+            )}
+          </IconButton> */}
+
+          <IconButton
+            size="small"
+            color="primary"
+            disabled={source.currently_scraping || triggerScrape.isPending}
+            sx={{ alignSelf: "flex-start" }}
+            onClick={async () =>
+              await triggerScrape.mutateAsync({
+                sourceId: source.id,
+                topicId: source.topic_id,
+              })
+            }
+          >
+            <UpdateIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            color="primary"
+            sx={{ alignSelf: "flex-start" }}
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            color="primary"
+            sx={{ alignSelf: "flex-start" }}
+            onClick={() => onEdit(source)}
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
         </Box>
-        <IconButton
-          size="small"
-          color="primary"
-          sx={{ alignSelf: "flex-start" }}
-          onClick={() => onEdit(source)}
-        >
-          <EditIcon fontSize="small" />
-        </IconButton>
-      </Box>
-    </Paper>
+      </Paper>
+      {deleteDialogOpen && (
+        <DeleteConfirmationDialog
+          name={source.name}
+          handleClose={() => setDeleteDialogOpen(false)}
+          handleDelete={async () =>
+            await deleteScrapingSource.mutateAsync({
+              sourceId: source.id,
+              topicId: source.topic_id,
+            })
+          }
+          isPending={deleteScrapingSource.isPending}
+        />
+      )}
+    </>
   );
 }

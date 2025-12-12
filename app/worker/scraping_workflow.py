@@ -20,6 +20,7 @@ from sqlalchemy import cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, selectinload
 
+from app.api.v1.sse import sse_broadcaster
 from app.core.config import settings
 from app.core.enums import ScrapingSourceEnum
 from app.database import get_db_session
@@ -28,6 +29,7 @@ from app.models.event import EventDB
 from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.websource import WebSourceDB
+from app.schemas.scraping_source import ScrapingSourceResponse
 from app.schemas.topic import TopicBase
 
 from .llm_service import LlmService
@@ -726,6 +728,18 @@ class Scraper:
             await db.commit()
             await db.refresh(scraping_source)
 
+            # Broadcast after success
+            await sse_broadcaster.publish(
+                user_id=self.user_id,
+                message=json.dumps(
+                    {
+                        "type": "scraping_update",
+                        "topic_id": scraping_source.topic_id,
+                        "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump_json(),
+                    }
+                ),
+            )
+
     async def _prepare_scraper(self, checkpointer: AsyncPostgresSaver | None = None):
         async with get_db_session() as db:
             scraping_source: ScrapingSourceDB = (
@@ -769,6 +783,7 @@ class Scraper:
                 user_id=current_user.id,
                 is_demo_user=is_demo_user,
             )
+            self.user_id = current_user.id
 
         scraping_source_workflow = ScrapingSourceWorkflow.model_validate(scraping_source, from_attributes=True)
 
@@ -871,4 +886,20 @@ class Scraper:
                 db.add(scraping_source)
                 await db.commit()
                 await db.refresh(scraping_source)
+
+                # Broadcast after failure
+                topic = (
+                    (await db.execute(select(TopicDB).where(TopicDB.id == scraping_source.topic_id))).scalars().first()
+                )
+                user = (await db.execute(select(UserDB).where(UserDB.id == topic.user_id))).scalars().first()
+                await sse_broadcaster.publish(
+                    user_id=user.id,
+                    message=json.dumps(
+                        {
+                            "type": "scraping_update",
+                            "topic_id": scraping_source.topic_id,
+                            "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump_json(),
+                        }
+                    ),
+                )
             raise  # so apscheduler logs the failure

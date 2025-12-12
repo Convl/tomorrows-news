@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
+import { amber } from "@mui/material/colors";
 import { useNavigate } from "react-router-dom";
 import ArticleIcon from "@mui/icons-material/Article";
 import RssFeedIcon from "@mui/icons-material/RssFeed";
@@ -35,10 +36,11 @@ import ScrapingSourceDialog from "./ScrapingSourceDialog";
 import EventsControlBar from "./EventsControlBar";
 
 export default function TopicDetail() {
-  const { topicId } = useParams();
+  const { topicId: topicIdString } = useParams();
+  const topicId = parseInt(topicIdString, 10);
   const [tabValue, setTabValue] = React.useState(0);
 
-  // Dialog state
+  // Edit dialog state
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingSource, setEditingSource] = React.useState(null);
 
@@ -66,8 +68,16 @@ export default function TopicDetail() {
 
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
   const { data: events, isLoading: eventsLoading } = useEvents(topicId);
-  const { data: scrapingSources, isLoading: sourcesLoading } =
+  const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
+
+  // Sort sources by creation date
+  const scrapingSources = React.useMemo(() => {
+    if (!scrapingSourcesData) return [];
+    return [...scrapingSourcesData].sort(
+      (a, b) => new Date(a.created_at) - new Date(b.created_at)
+    );
+  }, [scrapingSourcesData]);
 
   const isLoading = topicLoading || eventsLoading || sourcesLoading;
 
@@ -225,10 +235,10 @@ export default function TopicDetail() {
                       mt: 0.25,
                     }}
                   >
-                    <WarningIcon sx={{ fontSize: 12, color: "warning.main" }} />
+                    <WarningIcon sx={{ fontSize: 12, color: "error.main" }} />
                     <Typography
                       variant="caption"
-                      sx={{ fontSize: "0.65rem", color: "warning.main" }}
+                      sx={{ fontSize: "0.65rem", color: "error.main" }}
                     >
                       Overdue for scraping:{" "}
                       {scrapingStatus.overdueSources
@@ -246,13 +256,10 @@ export default function TopicDetail() {
                       mt: scrapingStatus.hasOverdue ? 0.25 : 0.25,
                     }}
                   >
-                    <CircularProgress
-                      size={10}
-                      sx={{ color: "warning.main" }}
-                    />
+                    <CircularProgress size={10} sx={{ color: amber[700] }} />
                     <Typography
                       variant="caption"
-                      sx={{ fontSize: "0.65rem", color: "warning.main" }}
+                      sx={{ fontSize: "0.65rem", color: amber[700] }}
                     >
                       Currently scraping:{" "}
                       {scrapingStatus.currentlyScraping
