@@ -55,6 +55,7 @@ class ScrapingSourceResponse(ScrapingSourceBase):
     topic_id: int
     last_scraped_at: datetime | None = None
     currently_scraping: bool | None = None
+    last_error: str | None = None
     created_at: datetime
     updated_at: datetime
 

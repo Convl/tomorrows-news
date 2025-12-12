@@ -735,7 +735,7 @@ class Scraper:
                     {
                         "type": "scraping_update",
                         "topic_id": scraping_source.topic_id,
-                        "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump_json(),
+                        "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump(mode="json"),
                     }
                 ),
             )
@@ -763,6 +763,7 @@ class Scraper:
                 raise Exception("Scraping source is currently scraping")
 
             scraping_source.currently_scraping = True
+            scraping_source.last_error = None
             db.add(scraping_source)
             await db.commit()
             await db.refresh(scraping_source)
@@ -775,6 +776,18 @@ class Scraper:
                 (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
             )
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
+
+            # TODO: Consider broadcasting start of scraping (currently handled via optimistic ui update)
+            # await sse_broadcaster.publish(
+            #     user_id=current_user.id,
+            #     message=json.dumps(
+            #         {
+            #             "type": "scraping_update",
+            #             "topic_id": scraping_source.topic_id,
+            #             "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump(mode="json"),
+            #         }
+            #     ),
+            # )
 
             self.logger = self.logger.bind(
                 topic_id=current_topic.id,
@@ -845,9 +858,6 @@ class Scraper:
         self.graph = self.graph_builder.compile(checkpointer=checkpointer)
         self.logger.info("Graph compiled successfully")
 
-    async def test(self, semantic_content: str):
-        self.logger.info(json.dumps(ExtractedEventBase.model_json_schema(), indent=2))
-
     @classmethod
     async def scrape_source(cls, source_id: int):
         """Entry point for scheduled scraping jobs"""
@@ -883,6 +893,7 @@ class Scraper:
                     .first()
                 )
                 scraping_source.currently_scraping = False
+                scraping_source.last_error = str(e)
                 db.add(scraping_source)
                 await db.commit()
                 await db.refresh(scraping_source)
@@ -898,7 +909,7 @@ class Scraper:
                         {
                             "type": "scraping_update",
                             "topic_id": scraping_source.topic_id,
-                            "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump_json(),
+                            "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump(mode="json"),
                         }
                     ),
                 )

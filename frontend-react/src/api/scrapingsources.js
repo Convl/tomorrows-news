@@ -10,24 +10,17 @@ export function useScrapingSources(topicId) {
           params: { topic_id: topicId },
         })
       )?.data,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (data && data.some((s) => s.currently_scraping)) {
-        return 3000;
-      }
-      return 1000 * 300;
-    },
   });
 }
 
-export function useScrapingSource(sourceId) {
-  return useQuery({
-    queryKey: ["scrapingsource", sourceId],
-    queryFn: async () =>
-      (await apiClient.get(`/scraping-sources/${sourceId}`))?.data,
-    enabled: !!sourceId,
-  });
-}
+// export function useScrapingSource(sourceId) {
+//   return useQuery({
+//     queryKey: ["scrapingsource", sourceId],
+//     queryFn: async () =>
+//       (await apiClient.get(`/scraping-sources/${sourceId}`))?.data,
+//     enabled: !!sourceId,
+//   });
+// }
 
 export function useCreateScrapingSource() {
   const queryClient = useQueryClient();
@@ -60,10 +53,10 @@ export function useUpdateScrapingSource() {
       return (await apiClient.put(`/scraping-sources/${sourceId}`, data))?.data;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(["scrapingsource", data.id], (old) =>
-        old ? { ...old, ...data } : data
-      );
-      queryClient.invalidateQueries({ queryKey: ["scrapingsource", data.id] });
+      // queryClient.setQueryData(["scrapingsource", data.id], (old) =>
+      //   old ? { ...old, ...data } : data
+      // );
+      // queryClient.invalidateQueries({ queryKey: ["scrapingsource", data.id] });
       queryClient.setQueryData(["scrapingsources", data.topic_id], (old) =>
         old
           ? old.map((source) => (source.id === data.id ? data : source))
@@ -100,13 +93,35 @@ export function useScrapeScrapingSourceNow() {
         await apiClient.post(`/scraping-sources/${sourceId}/trigger-scrape`)
       )?.data;
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["scrapingsources", variables.topicId],
+    onMutate: async ({ sourceId, topicId }) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({
+        queryKey: ["scrapingsources", topicId],
       });
-      queryClient.invalidateQueries({
-        queryKey: ["scrapingsource", variables.sourceId],
-      });
+
+      // backup previous sources
+      const previousSources = queryClient.getQueryData([
+        "scrapingsources",
+        topicId,
+      ]);
+      // optimistically update the cache (TODO: consider switching to broadcasting start of scraping in backend)
+      queryClient.setQueryData(["scrapingsources", topicId], (old) =>
+        old
+          ? old.map((source) =>
+              source.id === sourceId
+                ? { ...source, currently_scraping: true }
+                : source
+            )
+          : [{ id: sourceId, currently_scraping: true }]
+      );
+      return { previousSources };
+    },
+    onError: (error, variables, context) => {
+      // revert to previous sources on error
+      queryClient.setQueryData(
+        ["scrapingsources", topicId],
+        context.previousSources
+      );
     },
   });
 }

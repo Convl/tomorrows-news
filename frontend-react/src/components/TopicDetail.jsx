@@ -30,10 +30,12 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import { useTopic } from "../api/topic";
 import { useScrapingSources } from "../api/scrapingsources";
 import { useEvents } from "../api/events";
+import useSSE from "../api/sse";
 import EventCard from "./EventCard";
 import ScrapingSourceCard from "./ScrapingSourceCard";
 import ScrapingSourceDialog from "./ScrapingSourceDialog";
 import EventsControlBar from "./EventsControlBar";
+import { getScrapingSourceStatus } from "../utils/scrapingSourceStatus";
 
 export default function TopicDetail() {
   const { topicId: topicIdString } = useParams();
@@ -71,6 +73,9 @@ export default function TopicDetail() {
   const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
 
+  // Enable real-time updates
+  useSSE(topicId);
+
   // Sort sources by creation date
   const scrapingSources = React.useMemo(() => {
     if (!scrapingSourcesData) return [];
@@ -81,41 +86,23 @@ export default function TopicDetail() {
 
   const isLoading = topicLoading || eventsLoading || sourcesLoading;
 
-  // Check scraping sources status
   const scrapingStatus = React.useMemo(() => {
-    if (!scrapingSources || scrapingSources.length === 0) {
-      return { hasOverdue: false, currentlyScraping: [], overdueSources: [] };
-    }
-
     const now = new Date();
-    const currentlyScraping = [];
-    const overdueSources = [];
-
-    scrapingSources.forEach((source) => {
-      if (source.currently_scraping) {
-        currentlyScraping.push(source);
-      } else {
-        const lastScrapedDate = source.last_scraped_at
-          ? new Date(source.last_scraped_at)
-          : null;
-        if (lastScrapedDate && lastScrapedDate.getFullYear() > 1900) {
-          const scrapingFrequencyMs =
-            (source.scraping_frequency || 60) * 60 * 1000;
-          const nextDueDate = new Date(
-            lastScrapedDate.getTime() + scrapingFrequencyMs
-          );
-          if (nextDueDate < now) {
-            overdueSources.push(source);
-          }
+    return scrapingSources.reduce(
+      (acc, source) => {
+        const status = getScrapingSourceStatus(source);
+        if (["scraping", "failed", "overdue"].includes(status.state)) {
+          acc[status.state].push({ source, status });
         }
+        return acc;
+      },
+      {
+        failed: [],
+        scraping: [],
+        overdue: [],
       }
-    });
-
-    return {
-      currentlyScraping,
-      overdueSources,
-    };
-  }, [scrapingSources]);
+    );
+  }, [scrapingSources]); // Adding a timer for auto-refresh would require a state tick here too
 
   const handleToggleAllDescriptions = () => {
     const newState = !allDescriptionsExpanded;
@@ -226,28 +213,37 @@ export default function TopicDetail() {
                 }}
               >
                 <Box>Scraping Feeds</Box>
-                {scrapingStatus.overdueSources.length > 0 && (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      mt: 0.25,
-                    }}
-                  >
-                    <WarningIcon sx={{ fontSize: 12, color: "error.main" }} />
-                    <Typography
-                      variant="caption"
-                      sx={{ fontSize: "0.65rem", color: "error.main" }}
-                    >
-                      Overdue for scraping:{" "}
-                      {scrapingStatus.overdueSources
-                        .map((s) => s.name)
-                        .join(", ")}
-                    </Typography>
-                  </Box>
-                )}
-                {scrapingStatus.currentlyScraping.length > 0 && (
+                {["scraping", "failed", "overdue"].map((state) => {
+                  const affectedSources = scrapingStatus[state];
+                  if (affectedSources.length > 0) {
+                    return (
+                      <Box
+                        key={state}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          mt: 0.25,
+                        }}
+                      >
+                        {affectedSources[0].status.statusIcon}
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: "0.65rem",
+                            color: affectedSources[0].status.statusColor,
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {affectedSources[0].status.statusNavText}
+                          {affectedSources.map((s) => s.source.name).join(", ")}
+                        </Typography>
+                      </Box>
+                    );
+                  }
+                  return null;
+                })}
+                {/* {scrapingStatus.currentlyScraping.length > 0 && (
                   <Box
                     sx={{
                       display: "flex",
@@ -267,7 +263,7 @@ export default function TopicDetail() {
                         .join(", ")}
                     </Typography>
                   </Box>
-                )}
+                )} */}
               </Box>
             }
           />

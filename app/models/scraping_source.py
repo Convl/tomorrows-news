@@ -60,6 +60,7 @@ class ScrapingSourceDB(Base):
         default=datetime.datetime(1900, 1, 1),
     )
     currently_scraping: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Topic relationship
     topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
