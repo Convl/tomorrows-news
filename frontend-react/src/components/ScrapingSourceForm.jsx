@@ -143,8 +143,8 @@ export default function ScrapingSourceForm({
 
   return (
     <FormContainer formContext={formContext} onSuccess={handleSubmit}>
-      <Grid container spacing={3}>
-        <Grid size={4}>
+      <Grid container spacing={{ xs: 2, sm: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Box>
             <FieldWithTooltip
               tooltip={tooltips.name}
@@ -161,7 +161,7 @@ export default function ScrapingSourceForm({
           </Box>
         </Grid>
 
-        <Grid size={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <FieldWithTooltip
             tooltip={tooltips.base_url}
             icon={<LinkIcon />}
@@ -178,7 +178,7 @@ export default function ScrapingSourceForm({
           </FieldWithTooltip>
         </Grid>
 
-        <Grid size={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <FieldWithTooltip
             tooltip={tooltips.source_type}
             icon={<RssFeedIcon />}
@@ -195,7 +195,7 @@ export default function ScrapingSourceForm({
           </FieldWithTooltip>
         </Grid>
 
-        <Grid size={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <FieldWithTooltip
             tooltip={tooltips.country}
             icon={<PublicIcon />}
@@ -224,7 +224,7 @@ export default function ScrapingSourceForm({
           </FieldWithTooltip>
         </Grid>
 
-        <Grid size={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <FieldWithTooltip
             tooltip={tooltips.language}
             icon={<TranslateIcon />}
@@ -253,7 +253,7 @@ export default function ScrapingSourceForm({
           </FieldWithTooltip>
         </Grid>
 
-        <Grid size={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <FieldWithTooltip
             tooltip={tooltips.degrees_of_separation}
             icon={<TimelineIcon />}
@@ -281,7 +281,7 @@ export default function ScrapingSourceForm({
           </FieldWithTooltip>
         </Grid>
 
-        <Grid size={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <FieldWithTooltip
             tooltip={tooltips.scraping_frequency}
             icon={<AccessTimeIcon />}

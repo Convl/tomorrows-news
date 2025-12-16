@@ -30,6 +30,7 @@ import { getScrapingSourceStatus } from "../utils/scrapingSourceStatus";
 import TopicDialog from "./TopicDialog";
 import { useTopicManager } from "../hooks/useTopicManager";
 import { useScrapingSourceManager } from "../hooks/useScrapingSourceManager";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 export default function TopicDetail() {
   const { topicId: topicIdString } = useParams();
@@ -168,27 +169,51 @@ export default function TopicDetail() {
         sx={{
           mb: 4,
           display: "flex",
+          flexDirection: { xs: "column", md: "row" },
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", md: "center" },
+          gap: { xs: 2, md: 0 },
         }}
       >
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             {topic?.name}
           </Typography>
-          <Box sx={{ display: "flex", gap: 1 }}>
-            {topic?.keywords?.map((k) => (
-              <Chip key={k} label={k} size="small" variant="outlined" />
-            ))}
-          </Box>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<EditIcon />}
-          onClick={() => topicManager.openEditDialog(topic)}
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            flexDirection: { xs: "column", md: "row" },
+            width: { xs: "100%", md: "auto" },
+          }}
         >
-          Edit Topic
-        </Button>
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => topicManager.openEditDialog(topic)}
+            fullWidth={true}
+            sx={{
+              whiteSpace: "nowrap",
+              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+            }}
+          >
+            Edit Topic
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => topicManager.openDeleteDialog(topic)}
+            fullWidth={true}
+            sx={{
+              whiteSpace: "nowrap",
+              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+            }}
+          >
+            Delete Topic
+          </Button>
+        </Box>
       </Box>
 
       {/* Global Errors from Managers */}
@@ -384,27 +409,28 @@ export default function TopicDetail() {
             }
           />
         )}
-
-        {topicManager.topicDialogOpen && <TopicDialog manager={topicManager} />}
-
-        {topicManager.deleteDialogOpen && (
-          <DeleteConfirmationDialog
-            manager={topicManager}
-            warningText={
-              <>
-                ⚠️ Are you sure you want to delete "
-                {`${topicManager.editingTopic?.name}`}"?
-                <br />
-                <br />
-                This action cannot be undone. It will{" "}
-                <Box component="span" sx={{ fontWeight: "bold" }}>
-                  delete the topic and all associated Feeds and Events.
-                </Box>
-              </>
-            }
-          />
-        )}
       </TabPanel>
+
+      {/* Dialogs - rendered outside TabPanel so they work from any tab */}
+      {topicManager.topicDialogOpen && <TopicDialog manager={topicManager} />}
+
+      {topicManager.deleteDialogOpen && (
+        <DeleteConfirmationDialog
+          manager={topicManager}
+          warningText={
+            <>
+              ⚠️ Are you sure you want to delete "
+              {`${topicManager.editingTopic?.name}`}"?
+              <br />
+              <br />
+              This action cannot be undone. It will{" "}
+              <Box component="span" sx={{ fontWeight: "bold" }}>
+                delete the topic and all associated Feeds and Events.
+              </Box>
+            </>
+          }
+        />
+      )}
     </Box>
   );
 }

@@ -9,6 +9,7 @@ import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import { useTopicManager } from "../hooks/useTopicManager";
 
 const drawerWidth = 320;
+const mobileDrawerWidth = 240;
 
 export default function MainLayout() {
   const { data: topics, isLoading } = useTopics();
@@ -73,7 +74,7 @@ export default function MainLayout() {
           display: { xs: "block", lg: "none" },
           "& .MuiDrawer-paper": {
             boxSizing: "border-box",
-            width: drawerWidth,
+            width: isMobile ? mobileDrawerWidth : drawerWidth,
           },
         }}
       >
