@@ -3,9 +3,12 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import current_active_user
 from app.database import get_db
+from app.models import ExtractedEventDB
 from app.models.user import UserDB
 from app.worker.scheduler import scheduler
 
@@ -55,20 +58,68 @@ async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(cur
 
 
 @router.get("/")
-async def dbg(current_user: UserDB = Depends(current_active_user)):
+async def dbg(current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)):
     """Debug endpoint, used for testing various things"""
     logger.info("This <red>is</red> a <yellow>test</yellow> message")
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    # if not current_user.is_superuser:
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    source_id = 15
-    from datetime import datetime, timedelta, timezone
+    import json
 
-    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
-    from app.database import get_db_session
-    from app.models import ScrapingSourceDB
-    from app.worker.scheduler import scheduler
+    from app.api.v1.sse import sse_broadcaster
+    from app.models.event import EventDB
+    from app.models.extracted_event import ExtractedEventDB
+    from app.schemas.event import EventResponse
+
+    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == 928)
+    event = (await db.execute(query)).scalars().first()
+    old_title = event.title
+    event.title = "Test Event"
+    db.add(event)
+    await db.flush()
+    await db.commit()
+    # Re-fetch event with extracted_events loaded for response
+    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
+    event = (await db.execute(query)).scalars().one()
+    await sse_broadcaster.publish(
+        user_id=current_user.id,
+        message=json.dumps(
+            {
+                "type": "event_update",
+                "topic_id": event.topic_id,
+                "payload": EventResponse.model_validate(event).model_dump(mode="json"),
+            }
+        ),
+    )
+    await asyncio.sleep(10)
+    event.title = old_title
+    db.add(event)
+    await db.flush()
+    await db.commit()
+    # Re-fetch event with extracted_events loaded for response
+    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
+    event = (await db.execute(query)).scalars().one()
+    await sse_broadcaster.publish(
+        user_id=current_user.id,
+        message=json.dumps(
+            {
+                "type": "event_update",
+                "topic_id": event.topic_id,
+                "payload": EventResponse.model_validate(event).model_dump(mode="json"),
+            }
+        ),
+    )
+
+    # source_id = 15
+    # from datetime import datetime, timedelta, timezone
+
+    # from sqlalchemy import select
+
+    # from app.database import get_db_session
+    # from app.models import ScrapingSourceDB
+    # from app.worker.scheduler import scheduler
 
     # Clear test data before running scraper
     # from sqlalchemy import delete, select

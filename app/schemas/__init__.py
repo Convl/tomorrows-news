@@ -1,8 +1,8 @@
-from .event import EventCreate, EventResponse, EventUpdate
+from .event import EventResponse, EventUpdate
 from .extracted_event import ExtractedEventResponse
 from .scraping_source import ScrapingSourceCreate, ScrapingSourceResponse, ScrapingSourceUpdate
 from .topic import TopicCreate, TopicResponse, TopicUpdate
-from .user import UserCreate, UserUpdate, UserRead
+from .user import UserCreate, UserRead, UserUpdate
 
 __all__ = [
     "UserCreate",
@@ -11,7 +11,6 @@ __all__ = [
     "TopicCreate",
     "TopicResponse",
     "TopicUpdate",
-    "EventCreate",
     "EventResponse",
     "EventUpdate",
     "ScrapingSourceCreate",

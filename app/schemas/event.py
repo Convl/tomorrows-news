@@ -16,18 +16,6 @@ class EventBase(BaseModel):
     additional_infos: Dict[str, str] | None = None
 
 
-class EventCreate(EventBase):
-    topic_id: int
-    # Provenance fields for tracking which extracted event provided each field
-    title_from_id: int | None = None
-    description_from_id: int | None = None
-    date_from_id: int | None = None
-    location_from_id: int | None = None
-    duration_from_id: int | None = None
-    confidence_score: float = Field(default=1.0, ge=0.0, le=1.0)
-    semantic_vector: List[float] | None = None
-
-
 class EventUpdate(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=500)
     description: str | None = None

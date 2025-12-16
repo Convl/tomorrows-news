@@ -8,7 +8,6 @@ export function useTopics() {
       const { data } = await apiClient.get("/topics");
       return data;
     },
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -22,6 +21,35 @@ export function useCreateTopic() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["topics"] });
+    },
+  });
+}
+
+export function useDeleteTopic() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ topicId }) => {
+      const { data } = await apiClient.delete(`/topics/${topicId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["topics"] });
+    },
+  });
+}
+
+export function useUpdateTopic() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ topicId, data: topicData }) => {
+      const { data } = await apiClient.put(`/topics/${topicId}`, topicData);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["topics"] });
+      queryClient.invalidateQueries({ queryKey: ["topic", variables.topicId] });
     },
   });
 }

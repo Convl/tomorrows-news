@@ -6,6 +6,6 @@ export function useEvents(topicId) {
     queryKey: ["events", topicId],
     queryFn: async () =>
       (await apiClient.get("/events", { params: { topic_id: topicId } }))?.data,
-    refetchInterval: 30 * 1000,
+    // refetchInterval: 30 * 1000,
   });
 }

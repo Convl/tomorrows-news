@@ -1,4 +1,11 @@
-import { Paper, Box, Typography, Chip, IconButton } from "@mui/material";
+import {
+  Paper,
+  Box,
+  Typography,
+  Chip,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
 import PublicIcon from "@mui/icons-material/Public";
 import RssFeedIcon from "@mui/icons-material/RssFeed";
 import ApiIcon from "@mui/icons-material/Api";
@@ -106,41 +113,46 @@ export default function ScrapingSourceCard({ source, onEdit }) {
             )}
           </IconButton> */}
 
-          <IconButton
-            size="small"
-            color="primary"
-            disabled={source.currently_scraping || triggerScrape.isPending}
-            sx={{ alignSelf: "flex-start" }}
-            onClick={async () =>
-              await triggerScrape.mutateAsync({
-                sourceId: source.id,
-                topicId: source.topic_id,
-              })
-            }
-          >
-            <UpdateIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            color="primary"
-            sx={{ alignSelf: "flex-start" }}
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            color="primary"
-            sx={{ alignSelf: "flex-start" }}
-            onClick={() => onEdit(source)}
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
+          <Tooltip title="Trigger Scrape">
+            <IconButton
+              size="small"
+              color="primary"
+              disabled={source.currently_scraping || triggerScrape.isPending}
+              sx={{ alignSelf: "flex-start" }}
+              onClick={async () =>
+                await triggerScrape.mutateAsync({
+                  sourceId: source.id,
+                  topicId: source.topic_id,
+                })
+              }
+            >
+              <UpdateIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Source">
+            <IconButton
+              size="small"
+              color="primary"
+              sx={{ alignSelf: "flex-start" }}
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit Source">
+            <IconButton
+              size="small"
+              color="primary"
+              sx={{ alignSelf: "flex-start" }}
+              onClick={() => onEdit(source)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Paper>
       {deleteDialogOpen && (
         <DeleteConfirmationDialog
-          name={source.name}
           handleClose={() => setDeleteDialogOpen(false)}
           handleDelete={async () =>
             await deleteScrapingSource.mutateAsync({
@@ -149,6 +161,18 @@ export default function ScrapingSourceCard({ source, onEdit }) {
             })
           }
           isPending={deleteScrapingSource.isPending}
+          warningText={
+            <>
+              ⚠️ Are you sure you want to delete "{`${source.name}`}"?`
+              <br />
+              <br />
+              This action cannot be undone. It will stop all scheduled scraping
+              for this feed,{" "}
+              <Box component="span" sx={{ fontWeight: "bold" }}>
+                delete the feed and all events that have been extracted from it.
+              </Box>
+            </>
+          }
         />
       )}
     </>

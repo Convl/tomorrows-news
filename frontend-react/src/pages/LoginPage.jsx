@@ -83,6 +83,7 @@ export default function LoginPage() {
             placeholder="Enter password"
             fullWidth
             required
+            type="password"
             name="password"
           ></TextField>
           <Typography

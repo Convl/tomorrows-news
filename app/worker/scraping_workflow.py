@@ -18,7 +18,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from sqlalchemy import cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import QueryableAttribute, selectinload
+from sqlalchemy.orm import QueryableAttribute, defer, joinedload, selectinload
 
 from app.api.v1.sse import sse_broadcaster
 from app.core.config import settings
@@ -29,6 +29,7 @@ from app.models.event import EventDB
 from app.models.event_comparison import EventComparisonDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.websource import WebSourceDB
+from app.schemas.event import EventResponse
 from app.schemas.scraping_source import ScrapingSourceResponse
 from app.schemas.topic import TopicBase
 
@@ -50,7 +51,7 @@ from .scraping_utils import (
 )
 
 CONSIDER_SAME_EVENT_THRESHOLD = 0.7
-POSSIBLY_SAME_EVENT_THRESHOLD = 0.6
+POSSIBLY_SAME_EVENT_THRESHOLD = 0.55
 CONSIDER_NEW_DATE_TRUE_THRESHOLD = 3
 CONSIDER_NEW_DURATION_TRUE_THRESHOLD = 3
 CONSIDER_NEW_LOCATION_TRUE_THRESHOLD = 3
@@ -313,6 +314,7 @@ class Scraper:
                                 "similarity"
                             ),
                         )
+                        .options(selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector))
                         .where(EventDB.semantic_vector.isnot(None))
                         .where(EventDB.topic_id == extracted_event_db.topic_id)
                         .order_by(text("similarity DESC"))
@@ -321,7 +323,6 @@ class Scraper:
                 ).first()
                 event_db, similarity = event_with_similarity if event_with_similarity else (None, 0)
 
-                # TODO: change to if event_db and similarity > CONSIDER_SAME_EVENT_THRESHOLD, remove the latter condition in the next if clause, once confident about the threshold value
                 if event_db and similarity > POSSIBLY_SAME_EVENT_THRESHOLD:
                     merge_response = await self.merge_with_llm_if_same_event(extracted_event_db, event_db)
                     await self.store_event_comparison(
@@ -357,6 +358,31 @@ class Scraper:
                         await db.flush()
                         await self.update_event_db(event_db, extracted_event_db, merge_response, db)
                         await db.commit()
+                        # Re-fetch event with extracted_events loaded for sse publication
+                        event_db = (
+                            (
+                                await db.execute(
+                                    select(EventDB)
+                                    .options(
+                                        defer(EventDB.semantic_vector),
+                                        selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector),
+                                    )
+                                    .where(EventDB.id == event_db.id)
+                                )
+                            )
+                            .scalars()
+                            .one()
+                        )
+                        await sse_broadcaster.publish(
+                            user_id=self.user_id,
+                            message=json.dumps(
+                                {
+                                    "type": "event_update",
+                                    "topic_id": event_db.topic_id,
+                                    "payload": EventResponse.model_validate(event_db).model_dump(mode="json"),
+                                }
+                            ),
+                        )
                         continue
 
                 # if we get here, no similar event was found, so we create a new one
@@ -372,6 +398,31 @@ class Scraper:
                 db.add(extracted_event_db)
                 await db.flush()
                 await db.commit()
+                # Re-fetch new_event with extracted_events loaded for sse publication
+                new_event = (
+                    (
+                        await db.execute(
+                            select(EventDB)
+                            .options(
+                                defer(EventDB.semantic_vector),
+                                selectinload(EventDB.extracted_events).defer(ExtractedEventDB.semantic_vector),
+                            )
+                            .where(EventDB.id == new_event.id)
+                        )
+                    )
+                    .scalars()
+                    .one()
+                )
+                await sse_broadcaster.publish(
+                    user_id=self.user_id,
+                    message=json.dumps(
+                        {
+                            "type": "event_update",
+                            "topic_id": new_event.topic_id,
+                            "payload": EventResponse.model_validate(new_event).model_dump(mode="json"),
+                        }
+                    ),
+                )
 
     async def domain_limited_download(self, url, *args, **kwargs):
         """Download article with domain-based rate limiting."""
@@ -892,6 +943,7 @@ class Scraper:
                     .scalars()
                     .first()
                 )
+                scraping_source.last_scraped_at = datetime.datetime.now(timezone.utc)
                 scraping_source.currently_scraping = False
                 scraping_source.last_error = str(e)
                 db.add(scraping_source)

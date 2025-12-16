@@ -9,57 +9,42 @@ import {
   Button,
   CircularProgress,
   Chip,
-  Link,
-  Select,
-  MenuItem,
-  FormControl,
-  ToggleButtonGroup,
-  ToggleButton,
   Stack,
+  Alert,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
-import { amber } from "@mui/material/colors";
-import { useNavigate } from "react-router-dom";
 import ArticleIcon from "@mui/icons-material/Article";
 import RssFeedIcon from "@mui/icons-material/RssFeed";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import LinkIcon from "@mui/icons-material/Link";
-import WarningIcon from "@mui/icons-material/Warning";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import { useTopic } from "../api/topic";
+import { useTopics } from "../api/topics";
 import { useScrapingSources } from "../api/scrapingsources";
 import { useEvents } from "../api/events";
 import useSSE from "../api/sse";
 import EventCard from "./EventCard";
 import ScrapingSourceCard from "./ScrapingSourceCard";
 import ScrapingSourceDialog from "./ScrapingSourceDialog";
+import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
 import EventsControlBar from "./EventsControlBar";
 import { getScrapingSourceStatus } from "../utils/scrapingSourceStatus";
+import TopicDialog from "./TopicDialog";
+import { useTopicManager } from "../hooks/useTopicManager";
+import { useScrapingSourceManager } from "../hooks/useScrapingSourceManager";
 
 export default function TopicDetail() {
   const { topicId: topicIdString } = useParams();
   const topicId = parseInt(topicIdString, 10);
   const [tabValue, setTabValue] = React.useState(0);
+  const hasSetTab = React.useRef(false);
 
-  // Edit dialog state
-  const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editingSource, setEditingSource] = React.useState(null);
+  // Reset tab selection state when topic changes
+  React.useEffect(() => {
+    hasSetTab.current = false;
+  }, [topicId]);
 
-  const handleAddClick = () => {
-    setEditingSource(null);
-    setDialogOpen(true);
-  };
-
-  const handleEditClick = (source) => {
-    setEditingSource(source);
-    setDialogOpen(true);
-  };
-
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-    setEditingSource(null);
-  };
+  // Managers
+  const topicManager = useTopicManager();
+  const sourceManager = useScrapingSourceManager(topicId);
 
   const [sortBy, setSortBy] = React.useState("date");
   const [order, setOrder] = React.useState("ascending");
@@ -69,12 +54,13 @@ export default function TopicDetail() {
   const [expandedStates, setExpandedStates] = React.useState({});
 
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
+  const { data: topics } = useTopics();
   const { data: events, isLoading: eventsLoading } = useEvents(topicId);
   const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
 
   // Enable real-time updates
-  useSSE(topicId);
+  useSSE();
 
   // Sort sources by creation date
   const scrapingSources = React.useMemo(() => {
@@ -86,8 +72,21 @@ export default function TopicDetail() {
 
   const isLoading = topicLoading || eventsLoading || sourcesLoading;
 
+  // Auto-select tab based on sources availability
+  // Only runs once per topic load when data becomes available
+  React.useEffect(() => {
+    if (!sourcesLoading && scrapingSourcesData && !hasSetTab.current) {
+      if (scrapingSourcesData.length === 0) {
+        setTabValue(1); // Open Sources tab if no sources
+      } else {
+        setTabValue(0); // Open Events tab if sources exist
+      }
+      hasSetTab.current = true;
+    }
+  }, [sourcesLoading, scrapingSourcesData, topicId]);
+
+  // Get status info for all scraping sources with error states for quick view in the navigation tab
   const scrapingStatus = React.useMemo(() => {
-    const now = new Date();
     return scrapingSources.reduce(
       (acc, source) => {
         const status = getScrapingSourceStatus(source);
@@ -102,7 +101,7 @@ export default function TopicDetail() {
         overdue: [],
       }
     );
-  }, [scrapingSources]); // Adding a timer for auto-refresh would require a state tick here too
+  }, [scrapingSources]);
 
   const handleToggleAllDescriptions = () => {
     const newState = !allDescriptionsExpanded;
@@ -183,10 +182,33 @@ export default function TopicDetail() {
             ))}
           </Box>
         </Box>
-        <Button variant="outlined" startIcon={<EditIcon />}>
+        <Button
+          variant="outlined"
+          startIcon={<EditIcon />}
+          onClick={() => topicManager.openEditDialog(topic)}
+        >
           Edit Topic
         </Button>
       </Box>
+
+      {/* Global Errors from Managers */}
+      {(topicManager.error || sourceManager.error) &&
+        !topicManager.topicDialogOpen &&
+        !topicManager.deleteDialogOpen &&
+        !sourceManager.sourceDialogOpen &&
+        !sourceManager.deleteDialogOpen && (
+          <Alert
+            severity="error"
+            onClose={() => {
+              topicManager.closeDialogs();
+              sourceManager.closeDialogs();
+            }}
+            sx={{ mb: 2, whiteSpace: "pre-line" }}
+          >
+            {topicManager.error || sourceManager.error}
+          </Alert>
+        )}
+
       {/* 2. Tabs Navigation */}
       <Paper sx={{ mb: 3 }}>
         <Tabs
@@ -212,58 +234,47 @@ export default function TopicDetail() {
                   alignItems: "flex-start",
                 }}
               >
-                <Box>Scraping Feeds</Box>
-                {["scraping", "failed", "overdue"].map((state) => {
-                  const affectedSources = scrapingStatus[state];
-                  if (affectedSources.length > 0) {
-                    return (
-                      <Box
-                        key={state}
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          mt: 0.25,
-                        }}
-                      >
-                        {affectedSources[0].status.statusIcon}
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontSize: "0.65rem",
-                            color: affectedSources[0].status.statusColor,
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          {affectedSources[0].status.statusNavText}
-                          {affectedSources.map((s) => s.source.name).join(", ")}
-                        </Typography>
-                      </Box>
-                    );
-                  }
-                  return null;
-                })}
-                {/* {scrapingStatus.currentlyScraping.length > 0 && (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      mt: scrapingStatus.hasOverdue ? 0.25 : 0.25,
-                    }}
-                  >
-                    <CircularProgress size={10} sx={{ color: amber[700] }} />
-                    <Typography
-                      variant="caption"
-                      sx={{ fontSize: "0.65rem", color: amber[700] }}
-                    >
-                      Currently scraping:{" "}
-                      {scrapingStatus.currentlyScraping
-                        .map((s) => s.name)
-                        .join(", ")}
-                    </Typography>
-                  </Box>
-                )} */}
+                <Box>Information Sources</Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {/* Display summary of scraping sources with error states*/}
+                  {["scraping", "failed", "overdue"]
+                    .filter((state) => scrapingStatus[state].length > 0)
+                    .map((state, index, arr) => {
+                      const affectedSources = scrapingStatus[state];
+                      return (
+                        <React.Fragment key={state}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: "0.65rem",
+                              color: affectedSources[0].status.statusColor,
+                            }}
+                          >
+                            {state.charAt(0).toUpperCase() + state.slice(1)}:{" "}
+                            {affectedSources.length}
+                          </Typography>
+                          {index < arr.length - 1 && (
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontSize: "0.65rem",
+                                color: "text.disabled",
+                              }}
+                            >
+                              /
+                            </Typography>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                </Box>
               </Box>
             }
           />
@@ -325,7 +336,7 @@ export default function TopicDetail() {
             startIcon={<AddIcon />}
             variant="contained"
             size="small"
-            onClick={handleAddClick}
+            onClick={sourceManager.openCreateDialog}
           >
             Add New Feed
           </Button>
@@ -337,7 +348,8 @@ export default function TopicDetail() {
               <ScrapingSourceCard
                 key={source.id}
                 source={source}
-                onEdit={handleEditClick}
+                onEdit={sourceManager.openEditDialog}
+                onTriggerScrape={sourceManager.handleTriggerScrape}
               />
             ))}
           </Stack>
@@ -354,11 +366,42 @@ export default function TopicDetail() {
           </Paper>
         )}
 
-        {dialogOpen && (
-          <ScrapingSourceDialog
-            onClose={handleDialogClose}
-            topicId={topicId}
-            sourceToEdit={editingSource}
+        {sourceManager.sourceDialogOpen && (
+          <ScrapingSourceDialog manager={sourceManager} />
+        )}
+
+        {sourceManager.deleteDialogOpen && (
+          <DeleteConfirmationDialog
+            manager={sourceManager}
+            warningText={
+              <>
+                ⚠️ Are you sure you want to delete feed "
+                {`${sourceManager.editingSource?.name}`}"?
+                <br />
+                <br />
+                This action cannot be undone.
+              </>
+            }
+          />
+        )}
+
+        {topicManager.topicDialogOpen && <TopicDialog manager={topicManager} />}
+
+        {topicManager.deleteDialogOpen && (
+          <DeleteConfirmationDialog
+            manager={topicManager}
+            warningText={
+              <>
+                ⚠️ Are you sure you want to delete "
+                {`${topicManager.editingTopic?.name}`}"?
+                <br />
+                <br />
+                This action cannot be undone. It will{" "}
+                <Box component="span" sx={{ fontWeight: "bold" }}>
+                  delete the topic and all associated Feeds and Events.
+                </Box>
+              </>
+            }
           />
         )}
       </TabPanel>

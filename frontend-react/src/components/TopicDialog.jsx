@@ -1,4 +1,4 @@
-import React from "react";
+import TopicForm from "./TopicForm";
 import {
   Dialog,
   DialogTitle,
@@ -9,26 +9,23 @@ import {
   Alert,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ScrapingSourceForm from "./ScrapingSourceForm";
+import React from "react";
 
-// Dialog for creating/editing/deleting scraping sources. Rendered conditionally in the scraping sources tab of TopicDetail.
-export default function ScrapingSourceDialog({ manager }) {
-  // some conditional rendering logic differs depending on whether we are editing or creating a source
-  const isEdit = !!manager.editingSource;
+export default function TopicDialog({ manager }) {
+  const isEdit = !!manager.editingTopic;
 
   return (
     <Dialog open={true} onClose={manager.closeDialogs} maxWidth="md" fullWidth>
-      <DialogTitle>{isEdit ? "📡 Edit Feed" : "📡 Create Feed"}</DialogTitle>
+      <DialogTitle>{isEdit ? "📡 Edit Topic" : "📡 Create Topic"}</DialogTitle>
       <DialogContent>
         {manager.error && (
           <Alert severity="error" sx={{ mb: 3, whiteSpace: "pre-line" }}>
             {manager.error}
           </Alert>
         )}
-        <ScrapingSourceForm
-          onSubmit={manager.handleSave}
-          defaultValues={isEdit ? manager.editingSource : {}}
-          // passing submit / cancel / delete buttons to the form here as they depend on stuff like isEdit, DeleteDialog, etc
+        <TopicForm
+          defaultValues={isEdit ? manager.editingTopic : {}}
+          handleSubmit={manager.handleSave}
           formActions={
             <Box
               sx={{
@@ -38,18 +35,15 @@ export default function ScrapingSourceDialog({ manager }) {
                 justifyContent: isEdit ? "space-between" : "flex-end",
               }}
             >
-              {/* {TODO: Add option to delete / keep events that have been extracted from the feed} */}
               {isEdit && (
                 <Button
                   variant="outlined"
                   color="error"
                   startIcon={<DeleteIcon />}
-                  onClick={() =>
-                    manager.openDeleteDialog(manager.editingSource)
-                  }
+                  onClick={() => manager.openDeleteDialog(manager.editingTopic)}
                   disabled={manager.isPending}
                 >
-                  Delete Feed
+                  Delete Topic
                 </Button>
               )}
               <Box sx={{ display: "flex", gap: 2 }}>
@@ -74,7 +68,7 @@ export default function ScrapingSourceDialog({ manager }) {
                       : "Creating..."
                     : isEdit
                     ? "Save Changes"
-                    : "Create Feed"}
+                    : "Create Topic"}
                 </Button>
               </Box>
             </Box>

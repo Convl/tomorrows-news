@@ -13,16 +13,9 @@ from app.models.event import EventDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
-from app.schemas.event import EventCreate, EventResponse, EventSummary, EventUpdate
+from app.schemas.event import EventResponse, EventSummary, EventUpdate
 
 router = APIRouter()
-
-
-@router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
-async def create_event(event: EventCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new event"""
-    # TODO: Implement event creation logic with deduplication
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Event creation not implemented yet")
 
 
 @router.get("/{event_id}", response_model=EventResponse)

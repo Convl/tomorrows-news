@@ -13,15 +13,6 @@ export function useScrapingSources(topicId) {
   });
 }
 
-// export function useScrapingSource(sourceId) {
-//   return useQuery({
-//     queryKey: ["scrapingsource", sourceId],
-//     queryFn: async () =>
-//       (await apiClient.get(`/scraping-sources/${sourceId}`))?.data,
-//     enabled: !!sourceId,
-//   });
-// }
-
 export function useCreateScrapingSource() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -53,10 +44,6 @@ export function useUpdateScrapingSource() {
       return (await apiClient.put(`/scraping-sources/${sourceId}`, data))?.data;
     },
     onSuccess: (data) => {
-      // queryClient.setQueryData(["scrapingsource", data.id], (old) =>
-      //   old ? { ...old, ...data } : data
-      // );
-      // queryClient.invalidateQueries({ queryKey: ["scrapingsource", data.id] });
       queryClient.setQueryData(["scrapingsources", data.topic_id], (old) =>
         old
           ? old.map((source) => (source.id === data.id ? data : source))
@@ -73,8 +60,8 @@ export function useDeleteScrapingSource() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ sourceId, topicId }) => {
-      await apiClient.delete(`/scraping-sources/${sourceId}`);
-      return { topicId };
+      const { data } = await apiClient.delete(`/scraping-sources/${sourceId}`);
+      return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({

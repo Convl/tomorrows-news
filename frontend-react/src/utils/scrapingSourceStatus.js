@@ -1,5 +1,3 @@
-import { CircularProgress } from "@mui/material";
-import { Error } from "@mui/icons-material";
 import { amber } from "@mui/material/colors";
 
 //Display time interval (since last scrape / until next scrape / overdue since) in two highest divisible units
@@ -23,7 +21,7 @@ function formatTimeInterval(ms) {
   return result || "now";
 }
 
-//Get status info for the source (due / overdue / never scraped / currently scraping)
+//Get status info for the source (due / overdue / never scraped / currently scraping / failed)
 export function getScrapingSourceStatus(source) {
   const now = new Date();
   const scrapingFrequencyMs = source.scraping_frequency * 60 * 1000;
@@ -39,16 +37,12 @@ export function getScrapingSourceStatus(source) {
     : null;
 
   let statusDot = "";
-  let statusIcon;
-  let statusNavText = "";
   let statusText = "";
   let statusColor = "";
   let state = "";
 
   if (source.currently_scraping) {
     state = "scraping";
-    statusIcon = <CircularProgress size={12} sx={{ color: amber[700] }} />;
-    statusNavText = "Scraping: ";
     statusDot = "🟡";
     statusText = `Currently scraping • Last scraped: ${
       lastScrapedFormatted ? `${lastScrapedFormatted} ago` : "never"
@@ -66,8 +60,6 @@ export function getScrapingSourceStatus(source) {
 
     if (source.last_error) {
       state = "failed";
-      statusIcon = <Error sx={{ fontSize: 14, color: "error.main" }} />;
-      statusNavText = "Failed: ";
       statusDot = "❌";
       statusText = `Failed: ${source.last_error}\n\n • Last success: ${
         lastScrapedFormatted ? `${lastScrapedFormatted} ago` : "never"
@@ -79,8 +71,6 @@ export function getScrapingSourceStatus(source) {
       statusText = `Last scraped: ${lastScrapedFormatted} ago • ${nextDueFormatted}`;
       statusColor = "success.main";
     } else {
-      statusIcon = <Error sx={{ fontSize: 14, color: "error.main" }} />;
-      statusNavText = "Overdue: ";
       state = "overdue";
       statusDot = "🔴";
       statusText = `Last scraped: ${lastScrapedFormatted} ago • ${nextDueFormatted}`;
@@ -94,8 +84,6 @@ export function getScrapingSourceStatus(source) {
   }
 
   return {
-    statusIcon,
-    statusNavText,
     statusDot,
     statusText,
     statusColor,

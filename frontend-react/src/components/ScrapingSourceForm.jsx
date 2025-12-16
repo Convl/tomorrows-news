@@ -26,12 +26,14 @@ import PublicIcon from "@mui/icons-material/Public";
 import TranslateIcon from "@mui/icons-material/Translate";
 import TimelineIcon from "@mui/icons-material/Timeline";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import BadgeIcon from "@mui/icons-material/Badge";
 import {
   fetchCountryOptions,
   fetchLanguageOptions,
   fetchSourceTypeOptions,
   fetchLanguage,
 } from "../api/choices";
+import FieldWithTooltip from "./FieldWithTooltip";
 
 const tooltips = {
   name: "Source name, e.g. 'Presseschau der LTO', 'Politikressort der F.A.Z.', 'Pressemitteilungen des Bundesgerichtshofs'",
@@ -47,26 +49,9 @@ const tooltips = {
     "Where information about upcoming events is expected to be found, relative to the base url.\n1 = News content found DIRECTLY ON THE BASE URL, such as with a long-running liveblog. This option is rare / exotic\n2 = News content LINKED TO FROM THE BASE URL, such as with the base url or specific subsections (politics, business, etc) of any online news outlet. This option is by far the most common\n3 = News content LINKED TO FROM THE BASE URL, but contains further links, which must also be scraped. Use this option for press reviews or similar types of curated overviews, e.g. https://www.lto.de/recht/presseschau",
   scraping_frequency:
     "How often this feed shall be scraped for new events (minimum: 1 day / 24 hours / 1440 minutes)",
+  is_active:
+    "Whether the topic is active or not. The value in this field will be passed to the LLM that assists in the event extraction, and will directly impact the results that you see in your dashboard.",
 };
-
-// Wrapper for displaying fields with tooltips
-function FieldWithTooltip({ name, icon, label, children }) {
-  return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-        <Typography variant="body2" component="label">
-          {icon} {label}
-        </Typography>
-        <Tooltip title={tooltips[name]} arrow>
-          <IconButton size="small" sx={{ ml: 0.5, p: 0.5 }}>
-            <InfoIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      {children}
-    </Box>
-  );
-}
 
 export default function ScrapingSourceForm({
   onSubmit,
@@ -123,13 +108,6 @@ export default function ScrapingSourceForm({
     },
   };
 
-  // Icon styles
-  const iconSx = {
-    fontSize: "small",
-    sx: { mr: 0.5, verticalAlign: "middle" },
-    color: "primary",
-  };
-
   // Auto-set language based on country
   function autoSetLanguage(country) {
     const { languages } = fetchLanguage(country.value);
@@ -169,8 +147,8 @@ export default function ScrapingSourceForm({
         <Grid size={4}>
           <Box>
             <FieldWithTooltip
-              name="name"
-              icon={<InfoIcon {...iconSx} />}
+              tooltip={tooltips.name}
+              icon={<BadgeIcon />}
               label="Name (required)"
             >
               <TextFieldElement
@@ -185,8 +163,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={4}>
           <FieldWithTooltip
-            name="base_url"
-            icon={<LinkIcon {...iconSx} />}
+            tooltip={tooltips.base_url}
+            icon={<LinkIcon />}
             label="Base URL (required)"
             required
           >
@@ -202,8 +180,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={4}>
           <FieldWithTooltip
-            name="source_type"
-            icon={<RssFeedIcon {...iconSx} />}
+            tooltip={tooltips.source_type}
+            icon={<RssFeedIcon />}
             label="Source Type (required)"
           >
             <SelectElement
@@ -219,8 +197,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={6}>
           <FieldWithTooltip
-            name="country"
-            icon={<PublicIcon {...iconSx} />}
+            tooltip={tooltips.country}
+            icon={<PublicIcon />}
             label="Country"
           >
             <AutocompleteElement
@@ -248,8 +226,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={6}>
           <FieldWithTooltip
-            name="language"
-            icon={<TranslateIcon {...iconSx} />}
+            tooltip={tooltips.language}
+            icon={<TranslateIcon />}
             label="Language"
           >
             <AutocompleteElement
@@ -277,8 +255,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={6}>
           <FieldWithTooltip
-            name="degrees_of_separation"
-            icon={<TimelineIcon {...iconSx} />}
+            tooltip={tooltips.degrees_of_separation}
+            icon={<TimelineIcon />}
             label="Degrees of separation (required)"
           >
             <SelectElement
@@ -305,8 +283,8 @@ export default function ScrapingSourceForm({
 
         <Grid size={6}>
           <FieldWithTooltip
-            name="scraping_frequency"
-            icon={<AccessTimeIcon {...iconSx} />}
+            tooltip={tooltips.scraping_frequency}
+            icon={<AccessTimeIcon />}
             label="Scraping frequency (required)"
           >
             <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
@@ -337,7 +315,14 @@ export default function ScrapingSourceForm({
         </Grid>
 
         <Grid size={12}>
-          <CheckboxElement name="is_active" label="Active" />
+          <Box sx={{ display: "flex", alignItems: "center", mb: 0.0 }}>
+            <CheckboxElement name="is_active" label="Active" sx={{ mr: 0 }} />
+            <Tooltip title={tooltips.is_active} arrow sx={{ ml: 0, pl: 0 }}>
+              <IconButton size="small">
+                <InfoIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Grid>
       </Grid>
       {formActions}
