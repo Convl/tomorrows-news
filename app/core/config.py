@@ -76,8 +76,9 @@ class Settings(BaseSettings):
         "http://localhost:8001",
         "http://127.0.0.1:8000",
         # "https://*.azurewebsites.net",
-        "https://*.vercel.app",
-        "https://*.railway.app",
+        # "https://*.vercel.app",
+        # "https://*.railway.app",
+        "https://tomorrows-news.vercel.app",
     ]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
