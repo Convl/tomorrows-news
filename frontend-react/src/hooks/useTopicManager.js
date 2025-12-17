@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   useCreateTopic,
   useUpdateTopic,
@@ -10,6 +10,7 @@ import formatFastAPIError from "../utils/formatFastAPIError";
 
 export function useTopicManager() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: topics } = useTopics();
 
   // State
@@ -17,6 +18,17 @@ export function useTopicManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState(null);
   const [error, setError] = useState(null);
+
+  // Sync dialog state with URL hash
+  useEffect(() => {
+    // If the hash is removed (e.g. back button), close the dialogs
+    if (!location.hash) {
+      setTopicDialogOpen(false);
+      setDeleteDialogOpen(false);
+      setEditingTopic(null);
+      setError(null);
+    }
+  }, [location.hash]);
 
   // Mutations
   const createMutation = useCreateTopic();
@@ -33,18 +45,21 @@ export function useTopicManager() {
     setEditingTopic(null);
     setError(null);
     setTopicDialogOpen(true);
+    navigate("#create-topic");
   };
 
   const openEditDialog = (topic) => {
     setEditingTopic(topic);
     setError(null);
     setTopicDialogOpen(true);
+    navigate("#edit-topic");
   };
 
   const openDeleteDialog = (topic) => {
     setEditingTopic(topic);
     setError(null);
     setDeleteDialogOpen(true);
+    navigate("#delete-topic");
   };
 
   const closeDialogs = () => {
@@ -52,6 +67,9 @@ export function useTopicManager() {
     setDeleteDialogOpen(false);
     setEditingTopic(null);
     setError(null);
+    if (location.hash) {
+      navigate(-1);
+    }
   };
 
   // Logic
@@ -65,7 +83,11 @@ export function useTopicManager() {
         });
       } else {
         const newTopic = await createMutation.mutateAsync(data);
+        // We need to navigate to the new topic, which clears the hash automatically
         navigate(`/dashboard/topics/${newTopic.id}`);
+        // Return early since we navigated away
+        closeDialogs();
+        return;
       }
       closeDialogs();
     } catch (err) {
@@ -79,7 +101,10 @@ export function useTopicManager() {
       if (!editingTopic) return;
       const deletedId = editingTopic.id;
       await deleteMutation.mutateAsync({ topicId: deletedId });
-      closeDialogs();
+
+      setDeleteDialogOpen(false);
+      setEditingTopic(null);
+      setError(null);
 
       if (topics) {
         const remaining = topics.filter((t) => t.id !== deletedId);

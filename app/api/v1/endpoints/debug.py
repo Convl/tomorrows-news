@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import current_active_user
-from app.database import get_db
+from app.database import get_db, get_db_session
 from app.models import ExtractedEventDB
 from app.models.user import UserDB
 from app.worker.scheduler import scheduler
@@ -55,6 +55,31 @@ async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(cur
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     scheduler.remove_job(job_id=f"scraping_source_{source_id}", jobstore="scraping")
     return {"message": f"Job {f'scraping_source_{source_id}'} deleted"}
+
+
+@router.get("/get-magic-link")
+async def get_magic_link(
+    user_email: str,
+    lifetime_seconds: int = 0,
+    url: str = "https://tomorrows-news.vercel.app/login",
+    db: AsyncSession = Depends(get_db),
+    current_user: UserDB = Depends(current_active_user),
+):
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    if not (target_user := (await db.execute(select(UserDB).where(UserDB.email == user_email))).scalar_one_or_none()):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User {user_email} not found")
+
+    from fastapi_users.authentication import JWTStrategy
+
+    from app.core.config import settings
+
+    jwt_strategy = JWTStrategy(secret=settings.JWT_SECRET.get_secret_value(), lifetime_seconds=lifetime_seconds)
+    token = await jwt_strategy.write_token(target_user)
+
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}token={token}"
 
 
 @router.get("/")

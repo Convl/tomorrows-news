@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.email import EmailService
-from app.database import get_db
+from app.database import get_db, get_db_session
 from app.models.user import UserDB
 from app.schemas.user import UserCreate, UserRead, UserUpdate  # noqa: F401
 

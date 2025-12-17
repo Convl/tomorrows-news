@@ -8,16 +8,64 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Grid from "@mui/material/Grid";
 import Link from "@mui/material/Link";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import {
+  Link as RouterLink,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import apiClient from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
 import React from "react";
+import formatFastAPIError from "../utils/formatFastAPIError";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  React.useEffect(() => {
+    // check if magic link
+    const magicToken = searchParams.get("token");
+    if (magicToken) {
+      const handleMagicLogin = async () => {
+        try {
+          setLoading(true);
+          localStorage.setItem("token", magicToken);
+          const userRes = await apiClient.get("/users/me");
+          const userData = userRes.data;
+          login(userData);
+          navigate("/");
+        } catch (e) {
+          setError(
+            `It seems you have tried to log in via a magic link which is no longer valid.\nError:${formatFastAPIError(
+              e
+            )}`
+          );
+          localStorage.removeItem("token");
+        }
+      };
+      handleMagicLogin();
+    }
+
+    // check if already logged in
+    const token = localStorage.getItem("token");
+    if (token) {
+      const handleAlreadyLoggedIn = async () => {
+        try {
+          setLoading(true);
+          const userRes = await apiClient.get("/users/me");
+          const userData = userRes.data;
+          login(userData);
+          navigate("/");
+        } catch (e) {
+          localStorage.removeItem("token");
+        }
+      };
+      handleAlreadyLoggedIn();
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

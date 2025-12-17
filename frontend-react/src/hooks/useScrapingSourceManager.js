@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   useCreateScrapingSource,
   useUpdateScrapingSource,
@@ -8,11 +9,25 @@ import {
 import formatFastAPIError from "../utils/formatFastAPIError";
 
 export function useScrapingSourceManager(topicId) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // State
   const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
   const [error, setError] = useState(null);
+
+  // Sync dialog state with URL hash
+  useEffect(() => {
+    // If the hash is removed (e.g. back button), close the dialogs
+    if (!location.hash) {
+      setSourceDialogOpen(false);
+      setDeleteDialogOpen(false);
+      setEditingSource(null);
+      setError(null);
+    }
+  }, [location.hash]);
 
   // Mutations
   const createMutation = useCreateScrapingSource();
@@ -31,18 +46,21 @@ export function useScrapingSourceManager(topicId) {
     setEditingSource(null);
     setError(null);
     setSourceDialogOpen(true);
+    navigate("#create-feed");
   };
 
   const openEditDialog = (source) => {
     setEditingSource(source);
     setError(null);
     setSourceDialogOpen(true);
+    navigate("#edit-feed");
   };
 
   const openDeleteDialog = (source) => {
     setEditingSource(source);
     setError(null);
     setDeleteDialogOpen(true);
+    navigate("#delete-feed");
   };
 
   const closeDialogs = () => {
@@ -50,6 +68,9 @@ export function useScrapingSourceManager(topicId) {
     setDeleteDialogOpen(false);
     setEditingSource(null);
     setError(null);
+    if (location.hash) {
+      navigate(-1);
+    }
   };
 
   // Logic
