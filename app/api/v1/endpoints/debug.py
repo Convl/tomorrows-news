@@ -22,20 +22,16 @@ async def debug_frontend():
 
 
 @router.post("/trigger-job/{source_id}")
-async def debug_trigger_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
+async def debug_trigger_job(source_id: int):
     """Trigger a job for a scraping source"""
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     job_id = f"scraping_source_{source_id}"
     scheduler.modify_job(job_id, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30))
     return {"message": f"Job {job_id} scheduled to run in 30 seconds"}
 
 
 @router.get("/get-jobs")
-async def get_jobs(current_user: UserDB = Depends(current_active_user)):
+async def get_jobs():
     """Get all jobs"""
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     jobs = scheduler.get_jobs()
     return [
         {
@@ -49,10 +45,8 @@ async def get_jobs(current_user: UserDB = Depends(current_active_user)):
 
 
 @router.delete("/delete-scraping-job/{source_id}")
-async def delete_scraping_job(source_id: int, current_user: UserDB = Depends(current_active_user)):
+async def delete_scraping_job(source_id: int):
     """Delete a scraping job for a scraping source"""
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
     scheduler.remove_job(job_id=f"scraping_source_{source_id}", jobstore="scraping")
     return {"message": f"Job {f'scraping_source_{source_id}'} deleted"}
 
@@ -63,11 +57,7 @@ async def get_magic_link(
     lifetime_seconds: int = 0,
     url: str = "https://tomorrows-news.vercel.app/login",
     db: AsyncSession = Depends(get_db),
-    current_user: UserDB = Depends(current_active_user),
 ):
-    if not current_user.is_superuser:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
-
     if not (target_user := (await db.execute(select(UserDB).where(UserDB.email == user_email))).scalar_one_or_none()):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User {user_email} not found")
 
@@ -89,53 +79,53 @@ async def dbg(current_user: UserDB = Depends(current_active_user), db: AsyncSess
     # if not current_user.is_superuser:
     #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    import json
+    # import json
 
-    from sqlalchemy.orm import selectinload
+    # from sqlalchemy.orm import selectinload
 
-    from app.api.v1.sse import sse_broadcaster
-    from app.models.event import EventDB
-    from app.models.extracted_event import ExtractedEventDB
-    from app.schemas.event import EventResponse
+    # from app.api.v1.sse import sse_broadcaster
+    # from app.models.event import EventDB
+    # from app.models.extracted_event import ExtractedEventDB
+    # from app.schemas.event import EventResponse
 
-    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == 928)
-    event = (await db.execute(query)).scalars().first()
-    old_title = event.title
-    event.title = "Test Event"
-    db.add(event)
-    await db.flush()
-    await db.commit()
-    # Re-fetch event with extracted_events loaded for response
-    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
-    event = (await db.execute(query)).scalars().one()
-    await sse_broadcaster.publish(
-        user_id=current_user.id,
-        message=json.dumps(
-            {
-                "type": "event_update",
-                "topic_id": event.topic_id,
-                "payload": EventResponse.model_validate(event).model_dump(mode="json"),
-            }
-        ),
-    )
-    await asyncio.sleep(10)
-    event.title = old_title
-    db.add(event)
-    await db.flush()
-    await db.commit()
-    # Re-fetch event with extracted_events loaded for response
-    query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
-    event = (await db.execute(query)).scalars().one()
-    await sse_broadcaster.publish(
-        user_id=current_user.id,
-        message=json.dumps(
-            {
-                "type": "event_update",
-                "topic_id": event.topic_id,
-                "payload": EventResponse.model_validate(event).model_dump(mode="json"),
-            }
-        ),
-    )
+    # query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == 928)
+    # event = (await db.execute(query)).scalars().first()
+    # old_title = event.title
+    # event.title = "Test Event"
+    # db.add(event)
+    # await db.flush()
+    # await db.commit()
+    # # Re-fetch event with extracted_events loaded for response
+    # query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
+    # event = (await db.execute(query)).scalars().one()
+    # await sse_broadcaster.publish(
+    #     user_id=current_user.id,
+    #     message=json.dumps(
+    #         {
+    #             "type": "event_update",
+    #             "topic_id": event.topic_id,
+    #             "payload": EventResponse.model_validate(event).model_dump(mode="json"),
+    #         }
+    #     ),
+    # )
+    # await asyncio.sleep(10)
+    # event.title = old_title
+    # db.add(event)
+    # await db.flush()
+    # await db.commit()
+    # # Re-fetch event with extracted_events loaded for response
+    # query = select(EventDB).options(selectinload(EventDB.extracted_events)).where(EventDB.id == event.id)
+    # event = (await db.execute(query)).scalars().one()
+    # await sse_broadcaster.publish(
+    #     user_id=current_user.id,
+    #     message=json.dumps(
+    #         {
+    #             "type": "event_update",
+    #             "topic_id": event.topic_id,
+    #             "payload": EventResponse.model_validate(event).model_dump(mode="json"),
+    #         }
+    #     ),
+    # )
 
     # source_id = 15
     # from datetime import datetime, timedelta, timezone

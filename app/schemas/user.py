@@ -7,10 +7,11 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     created_at: datetime
     updated_at: datetime
+    is_demo_user : bool | None = False
 
 
 class UserCreate(schemas.BaseUserCreate):

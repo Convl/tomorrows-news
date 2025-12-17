@@ -1,26 +1,26 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import current_active_user, current_superuser
+from app.core.auth import current_active_non_demo_user, current_active_user
 from app.database import get_db
+from app.models.event import EventDB
 from app.models.extracted_event import ExtractedEventDB
 from app.models.scraping_source import ScrapingSourceDB
-from app.models.event import EventDB
-from app.models.websource import WebSourceDB
 from app.models.topic import TopicDB
 from app.models.user import UserDB
+from app.models.websource import WebSourceDB
 from app.schemas.topic import TopicCreate, TopicResponse, TopicUpdate, TopicWithCounts
-from loguru import logger
 
 router = APIRouter()
 
 
 @router.post("/", response_model=TopicResponse, status_code=status.HTTP_201_CREATED)
 async def create_topic(
-    topic: TopicCreate, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
+    topic: TopicCreate, current_user: UserDB = Depends(current_active_non_demo_user), db: AsyncSession = Depends(get_db)
 ):
     """Create a new topic for the current user"""
     # Create topic with current user's ID
@@ -94,7 +94,7 @@ async def list_topics(
 async def update_topic(
     topic_id: int,
     topic_update: TopicUpdate,
-    current_user: UserDB = Depends(current_active_user),
+    current_user: UserDB = Depends(current_active_non_demo_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a topic (only owner or admin)"""
@@ -120,7 +120,7 @@ async def update_topic(
 
 @router.delete("/{topic_id}")
 async def delete_topic(
-    topic_id: int, current_user: UserDB = Depends(current_active_user), db: AsyncSession = Depends(get_db)
+    topic_id: int, current_user: UserDB = Depends(current_active_non_demo_user), db: AsyncSession = Depends(get_db)
 ):
     """Delete a topic and all its related data (only owner or admin)"""
     log = f"Attempting to delete topic with id: {topic_id} "
@@ -137,16 +137,22 @@ async def delete_topic(
         logger.warning(log)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found or belongs to another user")
 
-    affected_scraping_source_ids = (await db.execute(select(ScrapingSourceDB.id).where(ScrapingSourceDB.topic_id == topic_id))).scalars().all()
+    affected_scraping_source_ids = (
+        (await db.execute(select(ScrapingSourceDB.id).where(ScrapingSourceDB.topic_id == topic_id))).scalars().all()
+    )
     log += f"\nIDS of ScrapingSources that got deleted as a result: {', '.join(map(str, affected_scraping_source_ids))}"
 
     affected_event_ids = (await db.execute(select(EventDB.id).where(EventDB.topic_id == topic_id))).scalars().all()
     log += f"\nIDS of Events that got deleted as a result: {', '.join(map(str, affected_event_ids))}"
 
-    affected_extracted_event_ids = (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.topic_id == topic_id))).scalars().all()
+    affected_extracted_event_ids = (
+        (await db.execute(select(ExtractedEventDB.id).where(ExtractedEventDB.topic_id == topic_id))).scalars().all()
+    )
     log += f"\nIDS of ExtractedEvents that got deleted as a result: {', '.join(map(str, affected_extracted_event_ids))}"
-    
-    affected_web_source_ids = (await db.execute(select(WebSourceDB.id).where(WebSourceDB.topic_id == topic_id))).scalars().all()
+
+    affected_web_source_ids = (
+        (await db.execute(select(WebSourceDB.id).where(WebSourceDB.topic_id == topic_id))).scalars().all()
+    )
     log += f"\nIDS of WebSources that got deleted as a result: {', '.join(map(str, affected_web_source_ids))}"
 
     await db.delete(topic)

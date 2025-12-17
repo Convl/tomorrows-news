@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.status import HTTP_409_CONFLICT
 
-from app.core.auth import current_active_user
+from app.core.auth import current_active_non_demo_user, current_active_user
 from app.database import get_db
 from app.models.event import EventDB
 from app.models.extracted_event import ExtractedEventDB
@@ -26,7 +26,7 @@ router = APIRouter()
 @router.post("/", response_model=ScrapingSourceResponse, status_code=status.HTTP_201_CREATED)
 async def create_scraping_source(
     source: ScrapingSourceCreate,
-    current_user: UserDB = Depends(current_active_user),
+    current_user: UserDB = Depends(current_active_non_demo_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new scraping source"""
@@ -121,7 +121,7 @@ async def get_scraping_source(
 async def update_scraping_source(
     source_id: int,
     source_update: ScrapingSourceUpdate,
-    current_user: UserDB = Depends(current_active_user),
+    current_user: UserDB = Depends(current_active_non_demo_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a scraping source"""
@@ -173,7 +173,7 @@ async def trigger_scrape(
 @router.delete("/{source_id}")
 async def delete_scraping_source(
     source_id: int,
-    current_user: UserDB = Depends(current_active_user),
+    current_user: UserDB = Depends(current_active_non_demo_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a scraping source and clean up orphaned events"""

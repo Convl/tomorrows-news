@@ -57,8 +57,6 @@ class Settings(BaseSettings):
     PROJECT_EMAIL_PORT: int
     PROJECT_EMAIL_HOST: str
 
-    DEMO_USER_EMAIL: str
-
     JWT_SECRET: SecretStr
     JWT_LIFETIME_SECONDS: int = (
         2592000  # 30 days, TODO: shorten this, add access / refresh tokens via fastapi-jwt-auth?

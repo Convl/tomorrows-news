@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.api.v1.endpoints import auth, debug, events, scraping_sources, sse_stream, topics
+from app.core.auth import current_superuser
 
 api_router = APIRouter()
 
@@ -20,4 +21,4 @@ api_router.include_router(sse_stream.router, tags=["stream"])
 api_router.include_router(topics.router, prefix="/topics", tags=["topics"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(scraping_sources.router, prefix="/scraping-sources", tags=["scraping-sources"])
-api_router.include_router(debug.router, prefix="/debug", tags=["debug"])
+api_router.include_router(debug.router, prefix="/debug", tags=["debug"], dependencies=[Depends(current_superuser)])

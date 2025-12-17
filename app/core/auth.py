@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
     AuthenticationBackend,
@@ -91,3 +91,9 @@ fastapi_users = FastAPIUsers[UserDB, uuid.UUID](get_user_manager, [auth_backend]
 # Dependencies for current user
 current_active_user = fastapi_users.current_user(active=True, verified=True)
 current_superuser = fastapi_users.current_user(active=True, verified=True, superuser=True)
+
+
+async def current_active_non_demo_user(user: UserDB = Depends(current_active_user)):
+    if user.is_demo_user:
+        raise HTTPException(status_code=403, detail="This method is not allowed for demo users")
+    return user

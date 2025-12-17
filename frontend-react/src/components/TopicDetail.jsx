@@ -31,6 +31,7 @@ import TopicDialog from "./TopicDialog";
 import { useTopicManager } from "../hooks/useTopicManager";
 import { useScrapingSourceManager } from "../hooks/useScrapingSourceManager";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function TopicDetail() {
   const { topicId: topicIdString } = useParams();
@@ -59,6 +60,7 @@ export default function TopicDetail() {
   const { data: events, isLoading: eventsLoading } = useEvents(topicId);
   const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
+  const { user } = useAuth();
 
   // Enable real-time updates
   useSSE();
@@ -164,6 +166,24 @@ export default function TopicDetail() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+      {/* notification for demo users */}
+      {user.is_demo_user && (
+        <Alert
+          severity="warning"
+          sx={{
+            borderRadius: 0,
+            justifyContent: "center",
+            py: 0.5,
+            mb: 1,
+            "& .MuiAlert-message": { width: "100%", textAlign: "center" },
+          }}
+        >
+          You are logged in to a pre-configured demo account that is actively
+          monitoring events for a number of topics. To create your own topics or
+          perform other write operations, please log out first and set up your
+          own account, as they will fail on this one.
+        </Alert>
+      )}
       {/* 1. Header Section */}
       <Box
         sx={{

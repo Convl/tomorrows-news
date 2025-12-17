@@ -826,7 +826,7 @@ class Scraper:
             current_user = (
                 (await db.execute(select(UserDB).where(UserDB.id == current_topic.user_id))).scalars().first()
             )
-            is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
+            is_demo_user = current_user.is_demo_user
 
             # TODO: Consider broadcasting start of scraping (currently handled via optimistic ui update)
             # await sse_broadcaster.publish(
