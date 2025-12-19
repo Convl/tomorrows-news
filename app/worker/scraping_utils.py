@@ -64,7 +64,10 @@ async def extract_sources_from_web(
     config.disable_category_cache = True
     config.thread_timeout_seconds = 120
 
-    website = await asyncio.to_thread(newspaper.build, scraping_source.base_url, only_in_path=True, config=config)
+    try:
+        website = await asyncio.to_thread(newspaper.build, scraping_source.base_url, only_in_path=True, config=config)
+    except:
+        website = None
 
     if website is None or len(website.articles) < MIN_ENTRIES_TO_CONSIDER_VALID_LISTING:
         # Parse the page AS an Article instead
@@ -134,7 +137,12 @@ async def extract_sources_from_web(
             if source is not None and source.date >= scraping_source.last_scraped_at:
                 sources.append(source)
             elif source is not None:
-                logger.info("❌ Article <cyan>{url}</cyan> has date <yellow>{article_date}</yellow>. That is invalid or older than last scrape date (<yellow>{last_scraped_at}</yellow>). Skipping.", url=article.url, article_date=source.date, last_scraped_at=scraping_source.last_scraped_at)
+                logger.info(
+                    "❌ Article <cyan>{url}</cyan> has date <yellow>{article_date}</yellow>. That is invalid or older than last scrape date (<yellow>{last_scraped_at}</yellow>). Skipping.",
+                    url=article.url,
+                    article_date=source.date,
+                    last_scraped_at=scraping_source.last_scraped_at,
+                )
             else:
                 logger.info("❌ Article <cyan>{url}</cyan> is None. Skipping.", url=article.url)
             await asyncio.sleep(0.1)

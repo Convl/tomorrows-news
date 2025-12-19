@@ -9,6 +9,8 @@ import {
 } from "@mui/material";
 
 export default function DeleteConfirmationDialog({ manager, warningText }) {
+  const open = manager?.deleteDialogOpen ?? true;
+
   return (
     <Dialog open={open} onClose={manager.closeDialogs}>
       <DialogTitle>Delete Feed</DialogTitle>

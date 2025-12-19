@@ -19,7 +19,17 @@ export default function FieldWithTooltip({ icon, label, children, tooltip }) {
         >
           {styledIcon} {label}
         </Typography>
-        <Tooltip title={tooltip} arrow>
+        <Tooltip
+          title={tooltip}
+          arrow
+          slotProps={{
+            tooltip: {
+              sx: {
+                whiteSpace: "pre-line",
+              },
+            },
+          }}
+        >
           <IconButton size="small" sx={{ ml: 0.5, p: 0.5 }}>
             <InfoIcon fontSize="small" />
           </IconButton>

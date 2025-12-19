@@ -61,9 +61,9 @@ export function useDeleteScrapingSource() {
       const { data } = await apiClient.delete(`/scraping-sources/${sourceId}`);
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["scrapingsources", data.topicId],
+        queryKey: ["scrapingsources", variables.topicId],
       });
     },
   });

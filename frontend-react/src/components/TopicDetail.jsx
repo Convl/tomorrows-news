@@ -11,11 +11,15 @@ import {
   Chip,
   Stack,
   Alert,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import ArticleIcon from "@mui/icons-material/Article";
 import RssFeedIcon from "@mui/icons-material/RssFeed";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { useTopic } from "../api/topic";
 import { useTopics } from "../api/topics";
 import { useScrapingSources } from "../api/scrapingsources";
@@ -38,7 +42,6 @@ export default function TopicDetail() {
   const topicId = parseInt(topicIdString, 10);
   const [tabValue, setTabValue] = React.useState(0);
   const hasSetTab = React.useRef(false);
-  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
 
   // Reset tab selection state when topic changes
   React.useEffect(() => {
@@ -62,6 +65,30 @@ export default function TopicDetail() {
   const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
   const { user } = useAuth();
+
+  // Logic to ensure topic description is collapsed (and expandable) if it spans > 2 lines on different devices
+  const descriptionCharLimits = {
+    xs: 150,
+    sm: 200,
+    md: 300,
+    lg: 400,
+    xl: 400,
+  };
+
+  const theme = useTheme();
+  const currentBreakpoint =
+    ["xl", "lg", "md", "sm", "xs"].find((key) =>
+      useMediaQuery(theme.breakpoints.up(key))
+    ) || "xs";
+
+  const descriptionCharLimit = descriptionCharLimits[currentBreakpoint];
+
+  const topicDescriptionisExpandable =
+    topic?.description &&
+    (topic.description.length > descriptionCharLimit ||
+      (topic.description.match(/\r\n|\r|\n/g) || []).length > 1);
+
+  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
 
   // Enable real-time updates
   useSSE();
@@ -186,76 +213,122 @@ export default function TopicDetail() {
         </Alert>
       )}
       {/* 1. Header Section */}
-      <Box
-        sx={{
-          mb: 4,
-          display: "flex",
-          flexDirection: { xs: "column", md: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", md: "center" },
-          gap: { xs: 2, md: 0 },
-        }}
-      >
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
-            {topic?.name}
-          </Typography>
-          {topic?.description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              onClick={() => setDescriptionExpanded(!descriptionExpanded)}
-              sx={{
-                mt: 1,
-                cursor: "pointer",
-                maxWidth: "800px",
-                "&:hover": {
-                  color: "text.primary",
-                },
-              }}
-            >
-              {descriptionExpanded
-                ? topic.description
-                : topic.description.length > 200
-                ? `${topic.description.slice(0, 200)}...`
-                : topic.description}
-            </Typography>
-          )}
-        </Box>
-        <Box
+      <Box sx={{ mb: 4 }}>
+        <Paper
+          elevation={0}
           sx={{
-            display: "flex",
-            gap: 1,
-            flexDirection: { xs: "column", md: "row" },
-            width: { xs: "100%", md: "auto" },
+            p: 3,
+            bgcolor: "background.paper",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
           }}
         >
-          <Button
-            variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={() => topicManager.openEditDialog(topic)}
-            fullWidth={true}
+          <Box
             sx={{
-              whiteSpace: "nowrap",
-              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 2,
+              mb: 2,
             }}
           >
-            Edit Topic
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => topicManager.openDeleteDialog(topic)}
-            fullWidth={true}
-            sx={{
-              whiteSpace: "nowrap",
-              fontSize: { xs: "0.75rem", sm: "0.875rem" },
-            }}
-          >
-            Delete Topic
-          </Button>
-        </Box>
+            <Typography variant="h4" fontWeight="bold">
+              {topic?.name}
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={() => topicManager.openEditDialog(topic)}
+                size="small"
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => topicManager.openDeleteDialog(topic)}
+                size="small"
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                Delete
+              </Button>
+            </Box>
+          </Box>
+
+          {topic?.description && (
+            <Box
+              sx={{
+                bgcolor: "action.hover",
+                p: 2,
+                borderRadius: 1,
+                cursor: topicDescriptionisExpandable ? "pointer" : "default",
+                transition: "background-color 0.2s",
+                "&:hover": {
+                  bgcolor: topicDescriptionisExpandable
+                    ? "action.selected"
+                    : "action.hover",
+                },
+              }}
+              onClick={() =>
+                topicDescriptionisExpandable &&
+                setDescriptionExpanded(!descriptionExpanded)
+              }
+            >
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                gutterBottom
+                sx={{ fontSize: "0.75rem", textTransform: "uppercase" }}
+              >
+                Description
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  whiteSpace: "pre-line",
+                  ...(!descriptionExpanded && {
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }),
+                }}
+              >
+                {descriptionExpanded
+                  ? topic.description
+                  : topic.description.length > descriptionCharLimit
+                  ? `${topic.description.slice(0, descriptionCharLimit)}...`
+                  : topic.description}
+              </Typography>
+              {topicDescriptionisExpandable && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mt: 1,
+                    color: "text.disabled",
+                    "&:hover": { color: "primary.main" },
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {descriptionExpanded ? "SHOW LESS" : "SHOW MORE"}
+                  </Typography>
+                  {descriptionExpanded ? (
+                    <ExpandLessIcon fontSize="small" />
+                  ) : (
+                    <ExpandMoreIcon fontSize="small" />
+                  )}
+                </Box>
+              )}
+            </Box>
+          )}
+        </Paper>
       </Box>
 
       {/* Global Errors from Managers */}
@@ -416,6 +489,7 @@ export default function TopicDetail() {
                 key={source.id}
                 source={source}
                 onEdit={sourceManager.openEditDialog}
+                onDelete={sourceManager.openDeleteDialog}
                 onTriggerScrape={sourceManager.handleTriggerScrape}
               />
             ))}

@@ -12,24 +12,14 @@ import ApiIcon from "@mui/icons-material/Api";
 import LinkIcon from "@mui/icons-material/Link";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ToggleOnIcon from "@mui/icons-material/ToggleOn";
-import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import UpdateIcon from "@mui/icons-material/Update";
-import {
-  useUpdateScrapingSource,
-  useScrapeScrapingSourceNow,
-} from "../api/scrapingsources";
-import { useDeleteScrapingSource } from "../api/scrapingsources";
-import DeleteConfirmationDialog from "./DeleteConfirmationDialog";
+import { useScrapeScrapingSourceNow } from "../api/scrapingsources";
 import React from "react";
 import { getScrapingSourceStatus } from "../utils/scrapingSourceStatus";
 
 // individual scraping source card component
-export default function ScrapingSourceCard({ source, onEdit }) {
-  const updateScrapingSource = useUpdateScrapingSource();
+export default function ScrapingSourceCard({ source, onEdit, onDelete }) {
   const triggerScrape = useScrapeScrapingSourceNow();
-  const deleteScrapingSource = useDeleteScrapingSource();
-  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 
   // Auto-update time display every minute
   const [_, setTick] = React.useState(0);
@@ -117,7 +107,7 @@ export default function ScrapingSourceCard({ source, onEdit }) {
               size="small"
               color="primary"
               sx={{ alignSelf: "flex-start" }}
-              onClick={() => setDeleteDialogOpen(true)}
+              onClick={() => onDelete(source)}
             >
               <DeleteIcon fontSize="small" />
             </IconButton>
@@ -134,30 +124,6 @@ export default function ScrapingSourceCard({ source, onEdit }) {
           </Tooltip>
         </Box>
       </Paper>
-      {deleteDialogOpen && (
-        <DeleteConfirmationDialog
-          handleClose={() => setDeleteDialogOpen(false)}
-          handleDelete={async () =>
-            await deleteScrapingSource.mutateAsync({
-              sourceId: source.id,
-              topicId: source.topic_id,
-            })
-          }
-          isPending={deleteScrapingSource.isPending}
-          warningText={
-            <>
-              ⚠️ Are you sure you want to delete "{`${source.name}`}"?`
-              <br />
-              <br />
-              This action cannot be undone. It will stop all scheduled scraping
-              for this feed,{" "}
-              <Box component="span" sx={{ fontWeight: "bold" }}>
-                delete the feed and all events that have been extracted from it.
-              </Box>
-            </>
-          }
-        />
-      )}
     </>
   );
 }
