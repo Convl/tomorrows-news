@@ -829,17 +829,16 @@ class Scraper:
             # TODO change to current_user.is_demo_user
             is_demo_user = current_user.email == settings.DEMO_USER_EMAIL
 
-            # TODO: Consider broadcasting start of scraping (currently handled via optimistic ui update)
-            # await sse_broadcaster.publish(
-            #     user_id=current_user.id,
-            #     message=json.dumps(
-            #         {
-            #             "type": "scraping_update",
-            #             "topic_id": scraping_source.topic_id,
-            #             "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump(mode="json"),
-            #         }
-            #     ),
-            # )
+            await sse_broadcaster.publish(
+                user_id=current_user.id,
+                message=json.dumps(
+                    {
+                        "type": "scraping_update",
+                        "topic_id": scraping_source.topic_id,
+                        "payload": ScrapingSourceResponse.model_validate(scraping_source).model_dump(mode="json"),
+                    }
+                ),
+            )
 
             self.logger = self.logger.bind(
                 topic_id=current_topic.id,

@@ -38,6 +38,7 @@ export default function TopicDetail() {
   const topicId = parseInt(topicIdString, 10);
   const [tabValue, setTabValue] = React.useState(0);
   const hasSetTab = React.useRef(false);
+  const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
 
   // Reset tab selection state when topic changes
   React.useEffect(() => {
@@ -199,6 +200,27 @@ export default function TopicDetail() {
           <Typography variant="h4" fontWeight="bold" gutterBottom>
             {topic?.name}
           </Typography>
+          {topic?.description && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+              sx={{
+                mt: 1,
+                cursor: "pointer",
+                maxWidth: "800px",
+                "&:hover": {
+                  color: "text.primary",
+                },
+              }}
+            >
+              {descriptionExpanded
+                ? topic.description
+                : topic.description.length > 200
+                ? `${topic.description.slice(0, 200)}...`
+                : topic.description}
+            </Typography>
+          )}
         </Box>
         <Box
           sx={{

@@ -2,7 +2,7 @@ from langchain_core.prompts import SystemMessagePromptTemplate
 
 # Template for event extraction system message
 EVENT_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
-"""
+    """
 You will be given a markdown-converted webpage by the user that should contain a news article, a blog post, a press release, or a similar piece of substantive content. Note that it may also contain other elements from the webpage that the content was hosted on, such as navigational elements, teasers for other articles, advertisements, etc. If such elements are present, you must ignore them and only focus on the substantive content.
 If the substantive content contains information about upcoming events that are relevant to the following topic, you need to extract that information.
 Topic name: {topic_name}
@@ -10,7 +10,7 @@ Topic description: {topic_description}
 When determining the date of an upcoming event, keep in mind that today's date is {current_date}, and that the substantive content you are looking at was published on {publish_date}.
 All extracted information should be in the following language: {language}.
 Notice that the point of this task is to help in creating a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
-Therefore, you should only extract information about events that 1. lie in the future, 2. are specific enough to server as actionable items in a forward planner, and 3. are important enough to be newsworthy. In general, mere plans or expectations are not sufficient, nor are vague dates or mere deadlines, unless they seem unusually interesting or important.
+Therefore, you should only extract information about events that 1. lie in the future, 2. are specific enough to serve as actionable items in a forward planner, and 3. are important enough to be newsworthy. In general, mere plans or expectations are not sufficient, nor are vague dates or mere deadlines, unless they seem unusually interesting or important.
 # Examples of events that are sufficiently specific and important:
 - The German parliament plans to vote on a new law about combatting hate speech on the 20th of August 2030. (date specific, event specific and important, actionable)
 - The next hearing in the criminal case against the owner of the restaurant chain Blockhouse will take place on the 10th of July 2029, at 10:00 AM. (date and time specific, event specific and important, actionable)

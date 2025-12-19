@@ -95,23 +95,6 @@ export default function ScrapingSourceCard({ source, onEdit }) {
               {source.base_url}
             </Typography>
           </Box>
-          {/* <IconButton
-            size="small"
-            color={source.is_active ? "primary" : "grey"}
-            sx={{ alignSelf: "flex-start" }}
-            onClick={async () =>
-              await updateScrapingSource.mutateAsync({
-                sourceId: source.id,
-                data: { is_active: !source.is_active },
-              })
-            }
-          >
-            {source.is_active ? (
-              <ToggleOnIcon fontSize="small" />
-            ) : (
-              <ToggleOffIcon fontSize="small" />
-            )}
-          </IconButton> */}
 
           <Tooltip title="Trigger Scrape">
             <IconButton

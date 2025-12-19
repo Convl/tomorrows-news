@@ -29,10 +29,8 @@ export function useCreateScrapingSource() {
       queryClient.setQueryData(["scrapingsources", data.topic_id], (old) =>
         old ? [...old, data] : [data]
       );
-      // Also invalidate the queries to trigger a re-fetch to be on the safe side
-      queryClient.invalidateQueries({
-        queryKey: ["scrapingsources", data.topic_id],
-      });
+      // We avoid invalidateQueries here to prevent overwriting optimistic states of other sources
+      // (e.g. if one is currently scraping)
     },
   });
 }
@@ -79,36 +77,6 @@ export function useScrapeScrapingSourceNow() {
       return (
         await apiClient.post(`/scraping-sources/${sourceId}/trigger-scrape`)
       )?.data;
-    },
-    onMutate: async ({ sourceId, topicId }) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({
-        queryKey: ["scrapingsources", topicId],
-      });
-
-      // backup previous sources
-      const previousSources = queryClient.getQueryData([
-        "scrapingsources",
-        topicId,
-      ]);
-      // optimistically update the cache (TODO: consider switching to broadcasting start of scraping in backend)
-      queryClient.setQueryData(["scrapingsources", topicId], (old) =>
-        old
-          ? old.map((source) =>
-              source.id === sourceId
-                ? { ...source, currently_scraping: true }
-                : source
-            )
-          : [{ id: sourceId, currently_scraping: true }]
-      );
-      return { previousSources };
-    },
-    onError: (error, variables, context) => {
-      // revert to previous sources on error
-      queryClient.setQueryData(
-        ["scrapingsources", topicId],
-        context.previousSources
-      );
     },
   });
 }
