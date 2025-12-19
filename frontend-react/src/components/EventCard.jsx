@@ -53,7 +53,7 @@ export default function EventCard({
       color: fontColor,
       fontWeight: Math.round(fontWeight),
       border: `1px solid`,
-      borderColor: theme.palette.primary.main,
+      borderColor: theme.palette.primary.dark,
       boxShadow: shadowDepth > 0 ? shadowDepth : "none",
     };
   }

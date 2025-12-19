@@ -2,6 +2,7 @@ import asyncio
 import html
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import feedparser
 import newspaper
@@ -152,18 +153,17 @@ async def extract_sources_from_web(
 
 def choose_input_for_listing_page(article_html: str, full_html: str, base_url: str, logger: "Logger") -> str | None:
     """Choose the best HTML input for a listing page that should contain article links."""
-    from urllib.parse import urlparse
 
     domain = urlparse(base_url).netloc
 
     # Check if article_html contains meaningful article links
     if _has_sufficient_article_links(article_html, domain):
         logger.info("✅ Article HTML contains sufficient article links, using it")
-        return article_html
+        return html.unescape(article_html).replace("\xad", "")
     elif _has_sufficient_article_links(full_html, domain):
         logger.info("❌ Article HTML does not contain sufficient article links, but full HTML does, using it")
         # no return sanitize(full_html) here, as it is only suited for articles, not listing pages
-        return full_html
+        return html.unescape(full_html).replace("\xad", "")
     else:
         logger.info("❌ Neither HTML version contains sufficient article links")
         return None
@@ -209,10 +209,12 @@ def _is_likely_article_link(href: str, domain: str) -> bool:
         if href_lower.startswith(pattern):
             return False
 
-    # Must be internal link or full URL to same domain
-    if href.startswith("/"):
+    parsed_href = urlparse(href)
+
+    # Must be internal link (no netloc) or full URL to same domain
+    if not parsed_href.netloc:
         return True
-    elif domain in href:
+    elif parsed_href.netloc == domain:
         return True
 
     return False
@@ -453,8 +455,8 @@ def sanitize_html(raw_html: str) -> str | None:
     # Unescape HTML entities like &shy;, &nbsp;, etc.
     unescaped_html = html.unescape(main_content)
 
-    # TODO: Check if markdownify has issues with any other HTML entities or just this one
-    cleaned_html = unescaped_html.replace("&shy;", " ")
+    # Remove soft hyphens (\xad) which appear after unescaping &shy;
+    cleaned_html = unescaped_html.replace("\xad", "")
 
     return cleaned_html
 

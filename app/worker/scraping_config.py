@@ -30,8 +30,9 @@ Therefore, you should only extract information about events that 1. lie in the f
 SOURCE_EXTRACTION_SYSTEM_TEMPLATE = SystemMessagePromptTemplate.from_template(
     """
 You will be given a markdown-converted webpage by the user that should contain a news article, a blog post, a press release, or a similar piece of substantive content. Note that it may also contain other elements from the webpage that the content was hosted on, such as navigational elements, links and teasers for other articles, advertisements, etc. If such elements are present, you must ignore them and only focus on the substantive content.
-If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage). If the links are relative links, you should convert them to absolute links, by prepending the base URL of the webpage. 
-The base URL is: {base_url}
+If there are links to other webpages WITHIN the substantive content that are relevant to the following topic, you need to extract those links (and, if possible, the title and publication date of the linked webpage).
+All links in your response must be absolute links, but the links found on the page may be either absolute or relative to the page on which they are found or relative to the base url. Keep absolute links as they are, but bear in mind the rules regarding URL resolution when resolving relative links to absolute links:
+The URL on which the links are found is: {url}
 Topic name: {topic_name}
 Topic description: {topic_description}
 """

@@ -46,6 +46,7 @@ export default function TopicDetail() {
   // Reset tab selection state when topic changes
   React.useEffect(() => {
     hasSetTab.current = false;
+    setDescriptionExpanded(false);
   }, [topicId]);
 
   // Managers
@@ -60,28 +61,21 @@ export default function TopicDetail() {
   const [expandedStates, setExpandedStates] = React.useState({});
 
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
-  const { data: topics } = useTopics();
   const { data: events, isLoading: eventsLoading } = useEvents(topicId);
   const { data: scrapingSourcesData, isLoading: sourcesLoading } =
     useScrapingSources(topicId);
   const { user } = useAuth();
 
   // Logic to ensure topic description is collapsed (and expandable) if it spans > 2 lines on different devices
-  const descriptionCharLimits = {
-    xs: 150,
-    sm: 200,
-    md: 300,
-    lg: 400,
-    xl: 400,
-  };
-
   const theme = useTheme();
-  const currentBreakpoint =
-    ["xl", "lg", "md", "sm", "xs"].find((key) =>
-      useMediaQuery(theme.breakpoints.up(key))
-    ) || "xs";
 
-  const descriptionCharLimit = descriptionCharLimits[currentBreakpoint];
+  const isXl = useMediaQuery(theme.breakpoints.up("xl"));
+  const isLg = useMediaQuery(theme.breakpoints.up("lg"));
+  const isMd = useMediaQuery(theme.breakpoints.up("md"));
+  const isSm = useMediaQuery(theme.breakpoints.up("sm"));
+
+  const descriptionCharLimit =
+    isXl || isLg ? 400 : isMd ? 300 : isSm ? 200 : 150;
 
   const topicDescriptionisExpandable =
     topic?.description &&
@@ -227,6 +221,7 @@ export default function TopicDetail() {
           <Box
             sx={{
               display: "flex",
+              flexDirection: { xs: "column", md: "row" },
               justifyContent: "space-between",
               alignItems: "flex-start",
               gap: 2,
@@ -236,12 +231,20 @@ export default function TopicDetail() {
             <Typography variant="h4" fontWeight="bold">
               {topic?.name}
             </Typography>
-            <Box sx={{ display: "flex", gap: 1 }}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1,
+                width: { xs: "100%", md: "auto" },
+                mt: { xs: 1, md: 0 },
+              }}
+            >
               <Button
                 variant="outlined"
                 startIcon={<EditIcon />}
                 onClick={() => topicManager.openEditDialog(topic)}
                 size="small"
+                fullWidth={!isMd}
                 sx={{ whiteSpace: "nowrap" }}
               >
                 Edit
@@ -252,6 +255,7 @@ export default function TopicDetail() {
                 startIcon={<DeleteIcon />}
                 onClick={() => topicManager.openDeleteDialog(topic)}
                 size="small"
+                fullWidth={!isMd}
                 sx={{ whiteSpace: "nowrap" }}
               >
                 Delete

@@ -27,7 +27,7 @@ class ScrapingSourceWorkflow(BaseModel):
 
     id: int
     topic_id: int
-    base_url: str
+    base_url: str  # TODO: rename to url
     source_type: ScrapingSourceEnum
     language: str | None = None
     country_code: str | None = None
