@@ -212,6 +212,7 @@ export default function ScrapingSourceForm({
               textFieldProps={{ fullWidth: true }}
               autocompleteProps={{
                 autoHighlight: true,
+                autoSelect: true,
                 // set country name and code manually, auto-set language unless already touched
                 onChange: (_e, opt) => {
                   if (!opt) return;
@@ -241,6 +242,7 @@ export default function ScrapingSourceForm({
               textFieldProps={{ fullWidth: true }}
               autocompleteProps={{
                 autoHighlight: true,
+                autoSelect: true,
                 // set language name and code manually and mark language selector as touched
                 onChange: (_e, opt) => {
                   if (!opt) return;

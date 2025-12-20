@@ -482,7 +482,7 @@ export default function TopicDetail() {
             size="small"
             onClick={sourceManager.openCreateDialog}
           >
-            Add New Feed
+            Add New Source
           </Button>
         </Box>
 
@@ -520,7 +520,7 @@ export default function TopicDetail() {
             manager={sourceManager}
             warningText={
               <>
-                ⚠️ Are you sure you want to delete feed "
+                ⚠️ Are you sure you want to delete source "
                 {`${sourceManager.editingSource?.name}`}"?
                 <br />
                 <br />
@@ -545,7 +545,7 @@ export default function TopicDetail() {
               <br />
               This action cannot be undone. It will{" "}
               <Box component="span" sx={{ fontWeight: "bold" }}>
-                delete the topic and all associated Feeds and Events.
+                delete the topic and all associated Sources and Events.
               </Box>
             </>
           }

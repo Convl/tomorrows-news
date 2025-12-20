@@ -97,7 +97,7 @@ class Scraper:
         new_value = getattr(extracted_event_db, field_name)
 
         # Query evidence for old value
-        evidence_for_old_value = (
+        raw_evidence_for_old_value = (
             (
                 await db.execute(
                     select(ExtractedEventDB)
@@ -108,9 +108,15 @@ class Scraper:
             .scalars()
             .all()
         )
+        # deduplicate evidence by source URL, as multiple ExtractedEventDBs may be extracted from the same source URL, but end up belonging to the same EventDB.
+        evidence_map = {}
+        for ev in raw_evidence_for_old_value:
+            if ev.source_url not in evidence_map:
+                evidence_map[ev.source_url] = ev
+        evidence_for_old_value = list(evidence_map.values())
 
         # Query evidence for new value
-        evidence_for_new_value = (
+        raw_evidence_for_new_value = (
             (
                 await db.execute(
                     select(ExtractedEventDB)
@@ -121,6 +127,11 @@ class Scraper:
             .scalars()
             .all()
         )
+        evidence_map = {}
+        for ev in raw_evidence_for_new_value:
+            if ev.source_url not in evidence_map:
+                evidence_map[ev.source_url] = ev
+        evidence_for_new_value = list(evidence_map.values())
 
         # Check if recent evidence for new value meets threshold
         recent_evidence_for_new_value = [
@@ -345,6 +356,12 @@ class Scraper:
                     )
                     # if extracted_event_db and event_db both refer to the same real-world event according to their vector scores and merge_with_llm_if_same_event, merge them
                     if merge_response.is_same_event:
+                        # Mental note: We set  ExtractedEventDB.event_id = EventDB.id even if there is already another entry in EventDB.extracted_events with the same source_url.
+                        # That can happen, despite the prior call to deduplicate_sources, if multiple "events" are extracted from the same source URL, but then
+                        # deemed by the event_merging_llm to belong to the same overall event (e.g. two deadlines mentioned in the same article about a piece of legislation).
+                        # Marking the ExtractedEventDB as a child of the EventDB (and filtering it out from display in the frontend) seems like the best way to handle this.
+                        # TODO: Track how often this happens, try to ensure the event_extracting_llm already "merges" the ExtractedEventDBs before returning them in extract_events_from_single_source
+
                         self.logger.info(
                             "### Merging <cyan>{title_1}</cyan> ({id_1}) into <cyan>{title_2}</cyan> ({id_2})",
                             title_1=extracted_event_db.title,
@@ -353,9 +370,9 @@ class Scraper:
                             id_2=event_db.id,
                         )
                         extracted_event_db.event_id = event_db.id
-
                         db.add(extracted_event_db)
                         await db.flush()
+
                         await self.update_event_db(event_db, extracted_event_db, merge_response, db)
                         await db.commit()
                         # Re-fetch event with extracted_events loaded for sse publication
@@ -446,7 +463,7 @@ class Scraper:
 
             source_extraction_system_message = await self.llm_service.get_source_extraction_system_message(
                 topic=state.scraping_source.topic,
-                base_url=source.url,
+                url=source.url,
             )
 
             messages = [
@@ -545,7 +562,24 @@ class Scraper:
             return {}
 
     async def deduplicate_sources(self, sources: list[WebSourceBase], scraping_source: ScrapingSourceDB):
-        """Remove duplicate sources from the list."""
+        """Remove dupliate sources from the list."""
+        # First, deduplicate internally within the list (no longer needed as reduce_sources is used instead)
+        seen_urls = set()
+        unique_sources = []
+        internal_duplicates = 0
+
+        for source in sources:
+            if source is None:
+                continue
+            if source.url in seen_urls:
+                internal_duplicates += 1
+                continue
+            seen_urls.add(source.url)
+            unique_sources.append(source)
+
+        sources = unique_sources
+
+        # Then, deduplicate against the database
         duplicates = 0
         none_results = 0
         async with get_db_session() as db:
@@ -589,11 +623,12 @@ class Scraper:
                     sources.pop(i)
 
             self.logger.info(
-                "✅ Found <yellow>{total}</yellow> sources for Scraping Source <cyan>{id}</cyan> ({base_url}), out of which <yellow>{duplicates}</yellow> were dropped as duplicates, <yellow>{none_results}</yellow> were dropped as None, and <yellow>{remaining}</yellow> were kept.",
+                "✅ Found <yellow>{total}</yellow> sources for Scraping Source <cyan>{id}</cyan> ({base_url}), out of which <yellow>{duplicates}</yellow> were dropped as duplicates against the database, <yellow>{internal_duplicates}</yellow> were dropped as internal duplicates, <yellow>{none_results}</yellow> were dropped as None, and <yellow>{remaining}</yellow> were kept.",
                 total=len(sources) + duplicates,
                 id=scraping_source.id,
                 base_url=scraping_source.base_url,
                 duplicates=duplicates,
+                internal_duplicates=internal_duplicates,
                 none_results=none_results,
                 remaining=len(sources),
             )
@@ -693,21 +728,26 @@ class Scraper:
 
     async def route_to_event_extraction(self, state: ScrapingState):
         """Route to event extraction for parallel processing."""
+        # Deduplicate sources based on URL to handle parallel execution overlaps
+        unique_sources_map = {source.url: source for source in state.sources}
+        unique_sources = list(unique_sources_map.values())
+
         self.logger.info(
-            "Event extraction phase - state has <yellow>{count}</yellow> total sources",
+            "Event extraction phase - state has <yellow>{count}</yellow> total sources, of which <yellow>{unique}</yellow> are unique",
             count=len(state.sources),
+            unique=len(unique_sources),
         )
 
-        if not state.sources:
+        if not unique_sources:
             self.logger.warning("❌ WARNING: No sources available for event extraction!")
             return []
 
         return [
             Send(
                 "extract_events_from_single_source",
-                {"source": source, "state": state, "current": i, "total": len(state.sources)},
+                {"source": source, "state": state, "current": i, "total": len(unique_sources)},
             )
-            for i, source in enumerate(state.sources, 1)
+            for i, source in enumerate(unique_sources, 1)
         ]
 
     async def print_events(self, state: ScrapingState):

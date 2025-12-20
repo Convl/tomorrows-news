@@ -11,19 +11,19 @@ When determining the date of an upcoming event, keep in mind that today's date i
 All extracted information should be in the following language: {language}.
 Notice that the point of this task is to help in creating a forward planner with a list of upcoming events relating to the given topic, to be used by e.g. journalists or business analysts.
 Therefore, you should only extract information about events that 1. lie in the future, 2. are specific enough to serve as actionable items in a forward planner, and 3. are important enough to be newsworthy. In general, mere plans or expectations are not sufficient, nor are vague dates or mere deadlines, unless they seem unusually interesting or important.
-# Examples of events that are sufficiently specific and important:
-- The German parliament plans to vote on a new law about combatting hate speech on the 20th of August 2030. (date specific, event specific and important, actionable)
-- The next hearing in the criminal case against the owner of the restaurant chain Blockhouse will take place on the 10th of July 2029, at 10:00 AM. (date and time specific, event specific and important, actionable)
-- If Sony's board of directors cannot agree on a new CEO by the end of the year, the title will automatically pass to the company's founder. (date specific, event specific and important, actionable)
-# Examples of events that are NOT sufficiently specific or important:
-- The German government plans to install a comittee for reviewing recent changes to the criminal code by the end of the year (date not specific, event somewhat vague, not actionable)
-- Some pundits suspect that the French president will issue his resignation at his annual address on the 1st of January next year. (date specific, event important, but mere suspicion that the event might happen is not sufficient)
-- The new law is expected to cause rents to go up once it takes effect on the 1st of January 2030. (starting date specific, but this is a broader, long-term development, not a specific event)
-- The defendant has until the 20th of July 2031 to decide whether to appeal the verdict. (date specific, but this is merely a deadline, not an actual event)
-- KPMG is hosting a seminar on best practices in accouting for students and young professionals (date specific, event specific, but not important / newsworthy)
-- If the defendant does not comply with the court's order within two weeks, he will have to pay a fine of 10.000 Euro (date specific, event specific, but not important / newsworthy)
-- Politician X expects that a decision on the new law will be made within the month of May (date vague, mere expectation)
 """
+    # # Examples of events that are sufficiently specific and important:
+    # - The German parliament plans to vote on a new law about combatting hate speech on the 20th of August 2030. (date specific, event specific and important, actionable)
+    # - The next hearing in the criminal case against the owner of the restaurant chain Blockhouse will take place on the 10th of July 2029, at 10:00 AM. (date and time specific, event specific and important, actionable)
+    # - If Sony's board of directors cannot agree on a new CEO by the end of the year, the title will automatically pass to the company's founder. (date specific, event specific and important, actionable)
+    # # Examples of events that are NOT sufficiently specific or important:
+    # - The German government plans to install a comittee for reviewing recent changes to the criminal code by the end of the year (date not specific, event somewhat vague, not actionable)
+    # - Some pundits suspect that the French president will issue his resignation at his annual address on the 1st of January next year. (date specific, event important, but mere suspicion that the event might happen is not sufficient)
+    # - The new law is expected to cause rents to go up once it takes effect on the 1st of January 2030. (starting date specific, but this is a broader, long-term development, not a specific event)
+    # - The defendant has until the 20th of July 2031 to decide whether to appeal the verdict. (date specific, but this is merely a deadline, not an actual event)
+    # - KPMG is hosting a seminar on best practices in accouting for students and young professionals (date specific, event specific, but not important / newsworthy)
+    # - If the defendant does not comply with the court's order within two weeks, he will have to pay a fine of 10.000 Euro (date specific, event specific, but not important / newsworthy)
+    # - Politician X expects that a decision on the new law will be made within the month of May (date vague, mere expectation)
 )
 
 # Template for source extraction system message

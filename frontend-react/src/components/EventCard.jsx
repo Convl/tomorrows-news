@@ -26,6 +26,15 @@ export default function EventCard({
 }) {
   const theme = useTheme();
   const extractedEvents = event.extracted_events ?? [];
+  // deduplicate extracted events by source URL, as multiple ExtractedEventDBs may be extracted from the same source URL,
+  // but end up belonging to the same EventDB, cf the comment in consolidate_extracted_events in scraping_workflow.py
+  const uniqueExtractedEvents = extractedEvents.reduce((acc, current) => {
+    const x = acc.find((item) => item.source_url === current.source_url);
+    if (!x) {
+      acc.push(current);
+    }
+    return acc;
+  }, []);
 
   const descriptionPreviewLength = 150;
   const shouldTruncate =
@@ -168,13 +177,13 @@ export default function EventCard({
           <Typography variant="subtitle2" gutterBottom color="primary.main">
             SOURCES
           </Typography>
-          {extractedEvents.length === 0 ? (
+          {uniqueExtractedEvents.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No sources for this event.
             </Typography>
           ) : (
             <Stack spacing={1}>
-              {extractedEvents.map((source) => (
+              {uniqueExtractedEvents.map((source) => (
                 <SourceCard key={source.id} source={source} />
               ))}
             </Stack>

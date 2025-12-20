@@ -45,7 +45,14 @@ async def web_sources_from_scraping_source(
     match scraping_source.source_type:
         case ScrapingSourceEnum.WEBPAGE:
             if scraping_source.degrees_of_separation == 0:
-                return [await download_and_parse_article(scraping_source.base_url, logger=logger)]
+                return [
+                    await download_and_parse_article(
+                        scraping_source.base_url,
+                        date_according_to_calling_func=datetime.now(),
+                        prefer_own_publish_date=True,
+                        logger=logger,
+                    )
+                ]
             else:
                 return await extract_sources_from_web(scraping_source, logger, llm_service)
         case ScrapingSourceEnum.RSS:

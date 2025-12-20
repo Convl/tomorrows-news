@@ -65,6 +65,9 @@ export function useDeleteScrapingSource() {
       queryClient.invalidateQueries({
         queryKey: ["scrapingsources", variables.topicId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["events", variables.topicId],
+      });
     },
   });
 }

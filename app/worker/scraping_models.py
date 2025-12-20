@@ -40,6 +40,23 @@ class ScrapingSourceWorkflow(BaseModel):
         from_attributes = True
 
 
+def reduce_sources(
+    current: list["WebSourceWithMarkdown"], new: list["WebSourceWithMarkdown"]
+) -> list["WebSourceWithMarkdown"]:
+    """Reduce sources by combining and removing duplicates based on URL."""
+    current = current or []
+
+    existing_urls = {s.url for s in current}
+
+    for source in new:
+        if source.url in existing_urls:
+            continue
+        current.append(source)
+        existing_urls.add(source.url)
+
+    return current
+
+
 class WebSourceBase(BaseModel):
     """A web source (article, press release, etc.)"""
 

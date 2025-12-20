@@ -29,7 +29,7 @@ export default function ScrapingSourceDialog({ manager }) {
       fullScreen={isMobile}
     >
       <DialogTitle sx={{ fontSize: { xs: "1.1rem", sm: "1.25rem" } }}>
-        {isEdit ? "📡 Edit Feed" : "📡 Create Feed"}
+        {isEdit ? "📡 Edit Source" : "📡 Create Source"}
       </DialogTitle>
       <DialogContent>
         {manager.error && (
@@ -67,7 +67,7 @@ export default function ScrapingSourceDialog({ manager }) {
                     order: { xs: 3, sm: 1 },
                   }}
                 >
-                  Delete Feed
+                  Delete Source
                 </Button>
               )}
               <Box
@@ -108,7 +108,7 @@ export default function ScrapingSourceDialog({ manager }) {
                       : "Creating..."
                     : isEdit
                     ? "Save Changes"
-                    : "Create Feed"}
+                    : "Create Source"}
                 </Button>
               </Box>
             </Box>
