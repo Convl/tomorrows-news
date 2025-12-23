@@ -104,7 +104,7 @@ class ScrapingSourceDB(Base):
     def schedule_job(self, run_immediately=False):
         """Schedule job for this source if it is active"""
         # Only schedule if source is active
-        if self.is_active and self.id != 54:  # TODO: Remove second condition, just used for testing
+        if self.is_active:
             from apscheduler.triggers.interval import IntervalTrigger
 
             from app.worker.scheduler import scheduler
