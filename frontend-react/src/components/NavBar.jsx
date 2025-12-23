@@ -9,13 +9,13 @@ import DarkMode from "@mui/icons-material/DarkMode";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import MenuIcon from "@mui/icons-material/Menu";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { useThemeMode } from "../contexts/ThemeModeContext";
+import { useLogout } from "../hooks/useLogout";
 
 export default function NavBar({ onMenuClick }) {
-  const { logout } = useAuth();
   const { mode, toggleMode } = useThemeMode();
   const navigate = useNavigate();
+  const logout = useLogout();
 
   function handleLogout() {
     logout();
