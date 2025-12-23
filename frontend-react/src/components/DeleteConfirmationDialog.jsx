@@ -10,10 +10,15 @@ import {
 
 export default function DeleteConfirmationDialog({ manager, warningText }) {
   const open = manager?.deleteDialogOpen ?? true;
+  const dialogTitle = manager?.editingTopic
+    ? "Delete Topic"
+    : manager?.editingSource
+    ? "Delete Information Source"
+    : "Delete Item";
 
   return (
     <Dialog open={open} onClose={manager.closeDialogs}>
-      <DialogTitle>Delete Feed</DialogTitle>
+      <DialogTitle>{dialogTitle}</DialogTitle>
       <DialogContent>
         <DialogContentText>{warningText}</DialogContentText>
       </DialogContent>
