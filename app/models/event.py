@@ -57,14 +57,15 @@ class EventDB(Base):
     update_history: Mapped[list[datetime]] = mapped_column(JSON, nullable=False, default=list)
 
     # Topic (parent)
-    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
     topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="events", lazy="raise")
 
     # Extracted Events (children)
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
         "ExtractedEventDB",
         back_populates="event",
-        cascade="all, delete-orphan",
+        cascade="save-update, merge, delete",
+        passive_deletes=True,
         foreign_keys="ExtractedEventDB.event_id",
         lazy="raise",
     )

@@ -1,9 +1,9 @@
-from datetime import date, datetime, time, timezone, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict
 
 import pytz
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, Interval
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, Interval, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -46,13 +46,15 @@ class ExtractedEventDB(Base):
     semantic_vector: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
 
     # Scraping Source which led to this extraction:
-    scraping_source_id: Mapped[int] = mapped_column(Integer, ForeignKey("scraping_sources.id"), nullable=False)
+    scraping_source_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("scraping_sources.id", ondelete="CASCADE"), nullable=False
+    )
     scraping_source: Mapped["ScrapingSourceDB"] = relationship(
         "ScrapingSourceDB", back_populates="extracted_events", lazy="raise"
     )
 
     # Topic which this extracted event belongs to
-    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
     topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="extracted_events", lazy="raise")
 
     # The consolidated event, create from this ExtractedEvent and others
@@ -113,7 +115,7 @@ class ExtractedEventDB(Base):
             topic_id=scraping_source.topic.id,
             event_id=event_id,
         )
-    
+
     @staticmethod
     def convert_date_to_utc(source_date: datetime) -> datetime:
         if source_date.tzinfo is None:

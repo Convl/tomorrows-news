@@ -63,14 +63,15 @@ class ScrapingSourceDB(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Topic relationship
-    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
     topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="scraping_sources", lazy="raise")
 
     # ExtractedEvents extracted via this ScrapingSource
     extracted_events: Mapped[list["ExtractedEventDB"]] = relationship(
         "ExtractedEventDB",
         back_populates="scraping_source",
-        cascade="all, delete-orphan",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
         lazy="raise",
     )
 
@@ -79,7 +80,8 @@ class ScrapingSourceDB(Base):
     sources: Mapped[list["WebSourceDB"]] = relationship(
         "WebSourceDB",
         back_populates="scraping_source",
-        cascade="all, delete-orphan",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
         lazy="raise",
     )
 
@@ -138,7 +140,7 @@ class ScrapingSourceDB(Base):
         try:
             scheduler.remove_job(self.job_id, jobstore=self.jobstore)
         except Exception:
-            raise
+            pass  # in case job was inactive
 
     def set_next_runtime(self, runtime):
         from app.worker.scheduler import scheduler

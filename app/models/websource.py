@@ -22,9 +22,13 @@ class WebSourceDB(Base):
 
     # Scraping Source which this source belongs to
     # TODO: nullable should really be False for the scraping_source_id. Setting it to True for now though, to ensure it works with exisiting db entries
-    scraping_source_id: Mapped[int] = mapped_column(Integer, ForeignKey("scraping_sources.id"), nullable=True) 
-    scraping_source: Mapped["ScrapingSourceDB"] = relationship("ScrapingSourceDB", back_populates="sources", lazy="raise")
+    scraping_source_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("scraping_sources.id", ondelete="CASCADE"), nullable=True
+    )
+    scraping_source: Mapped["ScrapingSourceDB"] = relationship(
+        "ScrapingSourceDB", back_populates="sources", lazy="raise"
+    )
 
     # Topic which this source belongs to
-    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id"), nullable=False)
+    topic_id: Mapped[int] = mapped_column(Integer, ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
     topic: Mapped["TopicDB"] = relationship("TopicDB", back_populates="sources", lazy="raise")

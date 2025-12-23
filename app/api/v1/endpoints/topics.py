@@ -137,10 +137,10 @@ async def delete_topic(
         logger.warning(log)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found or belongs to another user")
 
-    affected_scraping_source_ids = (
-        (await db.execute(select(ScrapingSourceDB.id).where(ScrapingSourceDB.topic_id == topic_id))).scalars().all()
+    affected_scraping_sources = (
+        (await db.execute(select(ScrapingSourceDB).where(ScrapingSourceDB.topic_id == topic_id))).scalars().all()
     )
-    log += f"\nIDS of ScrapingSources that got deleted as a result: {', '.join(map(str, affected_scraping_source_ids))}"
+    log += f"\nIDS of ScrapingSources that got deleted as a result: {', '.join(map(str, [s.id for s in affected_scraping_sources]))}"
 
     affected_event_ids = (await db.execute(select(EventDB.id).where(EventDB.topic_id == topic_id))).scalars().all()
     log += f"\nIDS of Events that got deleted as a result: {', '.join(map(str, affected_event_ids))}"
@@ -154,6 +154,13 @@ async def delete_topic(
         (await db.execute(select(WebSourceDB.id).where(WebSourceDB.topic_id == topic_id))).scalars().all()
     )
     log += f"\nIDS of WebSources that got deleted as a result: {', '.join(map(str, affected_web_source_ids))}"
+
+    for source in affected_scraping_sources:
+        try:
+            source.remove_job()
+        except Exception:
+            # Job might not exist
+            pass
 
     await db.delete(topic)
     await db.commit()

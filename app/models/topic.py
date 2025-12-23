@@ -33,19 +33,35 @@ class TopicDB(Base):
     )
 
     # Foreign key to user
-    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Relationships
     user: Mapped["UserDB"] = relationship("UserDB", back_populates="topics", lazy="raise")
     events: Mapped[List["EventDB"]] = relationship(
-        "EventDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+        "EventDB",
+        back_populates="topic",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
     )
     extracted_events: Mapped[List["ExtractedEventDB"]] = relationship(
-        "ExtractedEventDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+        "ExtractedEventDB",
+        back_populates="topic",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
     )
     scraping_sources: Mapped[List["ScrapingSourceDB"]] = relationship(
-        "ScrapingSourceDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+        "ScrapingSourceDB",
+        back_populates="topic",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
     )
     sources: Mapped[List["WebSourceDB"]] = relationship(
-        "WebSourceDB", back_populates="topic", cascade="all, delete-orphan", lazy="raise"
+        "WebSourceDB",
+        back_populates="topic",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
     )

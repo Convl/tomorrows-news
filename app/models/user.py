@@ -28,5 +28,9 @@ class UserDB(Base, SQLAlchemyBaseUserTableUUID):
 
     # Relationships
     topics: Mapped[List["TopicDB"]] = relationship(
-        "TopicDB", back_populates="user", cascade="all, delete-orphan", lazy="raise"
+        "TopicDB",
+        back_populates="user",
+        cascade="save-update, merge, delete, delete-orphan",
+        passive_deletes=True,
+        lazy="raise",
     )

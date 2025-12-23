@@ -217,7 +217,8 @@ async def delete_scraping_source(
     potentially_orphaned_event_ids = (await db.execute(event_ids_query)).scalars().all()
     orphaned_event_ids = []
 
-    # Delete the scraping source (cascades to extracted_events)
+    # Delete the scraping source and its jobs (cascades to extracted_events)
+    source.remove_job()
     await db.delete(source)
     await db.flush()
 
