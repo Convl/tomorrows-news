@@ -531,9 +531,10 @@ async def extract_sources_from_rss(scraping_source: ScrapingSourceDB, logger: "L
         # Skip entries without valid dates or that have already been scraped
         if date is None or date < scraping_source.last_scraped_at:
             logger.info(
-                "❌ Entry <cyan>{entry_id}</cyan> has date <yellow>{date}</yellow>. That is invalid or older than last scrape date. Skipping.",
+                "❌ Entry <cyan>{entry_id}</cyan> has date <yellow>{date}</yellow>. That is invalid or older than last scrape date (<yellow>{last_scraped_at}</yellow>). Skipping.",
                 entry_id=entry.id,
                 date=date,
+                last_scraped_at=scraping_source.last_scraped_at,
             )
             continue
 

@@ -2,7 +2,11 @@
 
 An intelligent events tracking and news monitoring application that automatically scrapes news sources, extracts upcoming events using LLM workflows, and deduplicates similar events using vector embeddings. Presented via React with React Router / React Router / Material UI.
 
-## What It Does
+## Project Idea
+
+This project is inspired by my time in journalism, where staying on top of upcoming events is crucial. To that end, newsrooms will spend a lot of hours manually curating forward planners relating to the topics they cover (or purchase access to such planners from news agencies or other media outlets). This project aims to automate that process, drastically reducing the required time and cost while enabling much more fine-grained definition of topics and event sources than is feasible with manual curation.
+
+## Core functionality
 
 - **Monitors News Sources**: Automatically scrapes configured news sources for upcoming events pertaining to the user's topic of interest
 - **Intelligent Extraction**: Uses LangChain/LangGraph workflow with LLM integration to extract structured event data
@@ -14,7 +18,7 @@ An intelligent events tracking and news monitoring application that automaticall
 
 ## Disclaimer
 
-I only recently started learning React, so the frontend is about 50/50 hand-written/AI-generated (albeit under close supervision and with manual verification / integration). The backend, on the other hand, is 100% hand-written, with AI-use limited to explaining concepts / helping to track down bugs and similar assistive tasks.
+I only recently started learning React, so the frontend is about 50/50 hand-written/AI-generated (albeit under close supervision and with manual verification / integration). The backend, on the other hand, is fully hand-written, with AI-use limited to explaining concepts / helping to track down bugs and similar assistive tasks.
 
 ## Tech Stack
 
