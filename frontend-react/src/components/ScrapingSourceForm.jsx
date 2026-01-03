@@ -263,6 +263,7 @@ export default function ScrapingSourceForm({
           >
             <SelectElement
               required
+              autoSelect
               name="degrees_of_separation"
               fullWidth
               options={[
