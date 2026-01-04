@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     PROJECT_EMAIL_PORT: int
     PROJECT_EMAIL_HOST: str
     DEMO_USER_EMAIL: str
+    RESEND_EMAIL: str
+    RESEND_API_KEY: SecretStr
 
     JWT_SECRET: SecretStr
     JWT_LIFETIME_SECONDS: int = (

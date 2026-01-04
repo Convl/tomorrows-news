@@ -5,16 +5,19 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
 
+import resend
 from loguru import logger
 
 from app.core.config import settings
+
+resend.api_key = settings.RESEND_API_KEY.get_secret_value()
 
 
 class EmailService:
     """Service for sending emails via SMTP."""
 
     @staticmethod
-    async def send_email(
+    async def send_email_smtp(
         to_emails: List[str],
         subject: str,
         html_content: str,
@@ -49,6 +52,28 @@ class EmailService:
             return False
 
     @staticmethod
+    def send_email_resend(
+        to_emails: List[str],
+        subject: str,
+        html_content: str,
+        text_content: str = None,
+    ) -> bool:
+        """Send an email via Resend."""
+        try:
+            params: resend.Emails.SendParams = {
+                "from": f"Tomorrow's News <{settings.RESEND_EMAIL}>",
+                "to": to_emails,
+                "subject": subject,
+                "html": html_content,
+                "text": text_content,
+            }
+            email: resend.Emails.SendResponse = resend.Emails.send(params)
+        except Exception as e:
+            logger.error("Failed to send email: <yellow>{error}</yellow>", error=e)
+            return False
+        return email
+
+    @staticmethod
     async def send_verification_email(email: str, token: str) -> bool:
         """Send verification email to user."""
         verification_url = f"{settings.FRONTEND_URL}/verify?token={token}"
@@ -81,7 +106,7 @@ class EmailService:
         If you didn't create an account, please ignore this email.
         """
 
-        return await EmailService.send_email(
+        return EmailService.send_email_resend(
             to_emails=[email],
             subject="Verify Your Email Address - Tomorrow's News",
             html_content=html_content,
@@ -121,7 +146,7 @@ class EmailService:
         If you didn't request a password reset, please ignore this email.
         """
 
-        return await EmailService.send_email(
+        return EmailService.send_email_resend(
             to_emails=[email],
             subject="Reset Your Password - Tomorrow's News",
             html_content=html_content,
