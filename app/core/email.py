@@ -10,17 +10,6 @@ from loguru import logger
 from app.core.config import settings
 
 
-def build_api_url(endpoint: str) -> str:
-    """Build a complete Frontend URL to the correct static page with token preserved."""
-    # endpoint examples: "verify?token=..." or "reset-password?token=..."
-    if endpoint.startswith("verify?"):
-        return f"{settings.FRONTEND_URL}/frontend/verify.html{endpoint[len('verify') :]}"
-    if endpoint.startswith("reset-password?"):
-        return f"{settings.FRONTEND_URL}/frontend/reset-password.html{endpoint[len('reset-password') :]}"
-    # Fallback
-    return f"{settings.FRONTEND_URL}/frontend/{endpoint}"
-
-
 class EmailService:
     """Service for sending emails via SMTP."""
 
@@ -62,7 +51,7 @@ class EmailService:
     @staticmethod
     async def send_verification_email(email: str, token: str) -> bool:
         """Send verification email to user."""
-        verification_url = f"{settings.FRONTEND_URL}/auth/verify.html?token={token}"
+        verification_url = f"{settings.FRONTEND_URL}/verify?token={token}"
 
         html_content = f"""
         <html>
@@ -102,7 +91,7 @@ class EmailService:
     @staticmethod
     async def send_password_reset_email(email: str, token: str) -> bool:
         """Send password reset email to user."""
-        reset_url = f"{settings.FRONTEND_URL}/auth/reset-password.html?token={token}"
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
 
         html_content = f"""
         <html>

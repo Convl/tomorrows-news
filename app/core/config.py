@@ -103,13 +103,8 @@ class Settings(BaseSettings):
     @property
     def FRONTEND_URL(self) -> str:
         """Auto-detect frontend URL based on environment"""
-        import os
 
-        # Azure App Service provides WEBSITE_HOSTNAME
-        if hostname := os.getenv("WEBSITE_HOSTNAME"):
-            return f"https://{hostname}/frontend"
-        # Fallback to configured URL (local development)
-        return "http://localhost:8000/frontend"
+        return "http://localhost:5173" if self.IS_DEV_SERVER else "https://tomorrows-news.vercel.app"
 
     class Config:
         env_file = ".env"

@@ -36,6 +36,7 @@ I only recently started learning React, so the frontend is about 50/50 hand-writ
 
 **Frontend**:
 
-- React / React Router for presentation
+- React / React Hook Form for presentation
+- React Router for routing
 - Tanstack Query + Axios for API interactions
 - Fetch Event Source for Auth Header support in SSE
