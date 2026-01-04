@@ -69,7 +69,7 @@ class EmailService:
             }
             email: resend.Emails.SendResponse = resend.Emails.send(params)
         except Exception as e:
-            logger.error("Failed to send email: <yellow>{error}</yellow>", error=e)
+            logger.error("Failed to send email: <yellow>{error}</yellow>", error=str(e))
             return False
         return email
 
