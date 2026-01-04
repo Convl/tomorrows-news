@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     DEMO_USER_EMAIL: str
     RESEND_EMAIL: str
     RESEND_API_KEY: SecretStr
+    CUSTOM_DOMAIN: str = ""
 
     JWT_SECRET: SecretStr
     JWT_LIFETIME_SECONDS: int = (
@@ -69,19 +70,24 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # CORS settings
-    CORS_ALLOW_ORIGINS: list[str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "http://localhost:8000",
-        "http://localhost:8001",
-        "http://127.0.0.1:8000",
-        # "https://*.azurewebsites.net",
-        # "https://*.vercel.app",
-        # "https://*.railway.app",
-        "https://tomorrows-news.vercel.app",
-    ]
+    @property
+    def CORS_ALLOW_ORIGINS(self) -> list[str]:
+        origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "http://localhost:8000",
+            "http://localhost:8001",
+            "http://127.0.0.1:8000",
+            # "https://*.azurewebsites.net",
+            # "https://*.vercel.app",
+            # "https://*.railway.app",
+            "https://tomorrows-news.vercel.app",
+            self.CUSTOM_DOMAIN,
+        ]
+        return origins
+
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
     CORS_ALLOW_HEADERS: list[str] = ["*"]
@@ -106,7 +112,13 @@ class Settings(BaseSettings):
     def FRONTEND_URL(self) -> str:
         """Auto-detect frontend URL based on environment"""
 
-        return "http://localhost:5173" if self.IS_DEV_SERVER else "https://tomorrows-news.vercel.app"
+        return (
+            "http://localhost:5173"
+            if self.IS_DEV_SERVER
+            else self.CUSTOM_DOMAIN
+            if self.CUSTOM_DOMAIN
+            else "https://tomorrows-news.vercel.app"
+        )
 
     class Config:
         env_file = ".env"
