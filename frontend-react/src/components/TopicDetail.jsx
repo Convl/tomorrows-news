@@ -201,9 +201,9 @@ export default function TopicDetail() {
           }}
         >
           You are logged in to a pre-configured demo account that is actively
-          monitoring events for a number of topics. To create your own topics or
-          perform other write operations, please log out first and set up your
-          own account, as they will fail on this one.
+          monitoring events for two topics. To create your own topics or perform
+          other write operations, please log out first and set up your own
+          account, as they will fail on this one.
         </Alert>
       )}
       {/* 1. Header Section */}
