@@ -1,5 +1,7 @@
 import asyncio
+import ctypes
 import datetime
+import gc
 import json
 from collections import defaultdict
 from datetime import timedelta, timezone
@@ -1006,3 +1008,13 @@ class Scraper:
                     ),
                 )
             raise  # so apscheduler logs the failure
+
+        finally:
+            # Force Python to release memory back to the OS.
+            # Without this, CPython's memory allocator holds onto freed pages,
+            # causing RSS to grow monotonically across scraping runs.
+            gc.collect()
+            try:
+                ctypes.CDLL("libc.so.6").malloc_trim(0)
+            except (OSError, AttributeError):
+                pass  # Not available on non-glibc systems
