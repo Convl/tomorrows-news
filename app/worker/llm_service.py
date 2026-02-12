@@ -22,7 +22,7 @@ class LlmService:
         )
 
         # model_name = "google/gemini-3-pro-preview" if is_demo_user else "google/gemini-3-flash-preview"
-        model_name = "google/gemini-3-pro-preview"
+        model_name = "google/gemini-3-flash-preview"
 
         self.llm = ChatOpenAI(
             openai_api_key=settings.OPENROUTER_API_KEY,
