@@ -1010,9 +1010,7 @@ class Scraper:
             raise  # so apscheduler logs the failure
 
         finally:
-            # Force Python to release memory back to the OS.
-            # Without this, CPython's memory allocator holds onto freed pages,
-            # causing RSS to grow monotonically across scraping runs.
+            # Testing gc.collect / malloc_trim here to see if it helps with memory not being freed after scraping jobs.
             gc.collect()
             try:
                 ctypes.CDLL("libc.so.6").malloc_trim(0)
